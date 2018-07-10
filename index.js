@@ -33,7 +33,7 @@ instance.prototype.config_fields = function () {
 			id: 'info',
 			width: 12,
 			label: 'Information',
-			value: 'This module is for controlling Chamsys MagicQ consoles'
+			value: 'To enable OSC on MagicQ you need to set the mode, and the transmit and/or receive port numbers in Setup, View Settings, Network. Setting a port to 0 disables transmitting/receiving of OSC.'
 		},
 		{
 			type: 'textinput',
@@ -59,54 +59,12 @@ instance.prototype.destroy = function() {
 	debug("destory", self.id);;
 };
 
-instance.prototype.fader_val = [
-	{ label: '- ∞',        id: '0.0' },
-	{ label: '-50 dB: ',   id: '0.1251' },
-	{ label: '-30 dB',     id: '0.251' },
-	{ label: '-20 dB',     id: '0.375' },
-	{ label: '-18 dB',     id: '0.4' },
-	{ label: '-15 dB',     id: '0.437' },
-	{ label: '-12 dB',     id: '0.475' },
-	{ label: '-9 dB',      id: '0.525' },
-	{ label: '-6 dB',      id: '0.6' },
-	{ label: '-3 dB',      id: '0.675' },
-	{ label: '-2 dB',      id: '0.7' },
-	{ label: '-1 dB',      id: '0.725' },
-	{ label: '0 dB',       id: '0.75' },
-	{ label: '+1 dB',      id: '0.775' },
-	{ label: '+2 dB',      id: '0.8' },
-	{ label: '+3 dB',      id: '0.825' },
-	{ label: '+4 dB',      id: '0.85' },
-	{ label: '+5 dB',      id: '0.875' },
-	{ label: '+6 dB',      id: '0.9' },
-	{ label: '+9 dB',      id: '0.975' },
-	{ label: '+10 dB',     id: '1.0' }
-];
-
-instance.prototype.color_val = [
-	{ label: 'Off',              id: '0' },
-	{ label: 'Red: ',            id: '1' },
-	{ label: 'Green',            id: '2' },
-	{ label: 'Yellow',           id: '3' },
-	{ label: 'Blue',             id: '4' },
-	{ label: 'Magenta',          id: '5' },
-	{ label: 'Cyan',             id: '6' },
-	{ label: 'White',            id: '7' },
-	{ label: 'Off Inverted',     id: '8' },
-	{ label: 'Red Inverted',     id: '9' },
-	{ label: 'Green Inverted',   id: '10' },
-	{ label: 'Yellow Inverted',  id: '11' },
-	{ label: 'Blue Inverted',    id: '12' },
-	{ label: 'Magenta Inverted', id: '13' },
-	{ label: 'Cyan Inverted',    id: '14' },
-	{ label: 'White Inverted',   id: '15' }
-];
 
 instance.prototype.actions = function(system) {
 	var self = this;
 	self.system.emit('instance_actions', self.id, {
 
-		'pb':     {
+		'pb':      {
 			label:      'Set the playback fader level',
 			options: [
 				{
@@ -118,7 +76,7 @@ instance.prototype.actions = function(system) {
 				},
 				{
 					type:     'textinput',
-					label:    'Fader value (0-100)',
+					label:    'Fader value (0-100 %)',
 					id:       'pbVal',
 					default:  '',
 					regex:    self.REGEX_NUMBER
@@ -139,7 +97,7 @@ instance.prototype.actions = function(system) {
 			]
 		},
 
-		'pbflash':     {
+		'pbFlash':     {
 			label:     'Flash Playback',
 			options: [
 				{
@@ -193,7 +151,7 @@ instance.prototype.actions = function(system) {
 					id:      'pbId',
 					default: '1',
 					regex:   self.REGEX_NUMBER
-				}
+				},
 				{
 					type:    'textinput',
 					label:   'Cue Nr',
@@ -231,11 +189,15 @@ instance.prototype.action = function(action) {
 				type: "i",
 				value: opt.pbVal
 			};
-			self.system.emit('osc_send', self.config.host, self.config.port,'/pb/'+ opt.pbId  , [arg]);
+			cmd = '/pb/'+ opt.pbId;
+			debug(cmd,arg);
+			self.system.emit('osc_send', self.config.host, self.config.port, cmd, [arg]);
 		break;
 
 		case 'pbGo':
-			self.system.emit('osc_send', self.config.host, self.config.port,'/pb/' + opt.pbId + '/go' ,[]);
+			cmd = '/pb/' + opt.pbId + '/go';
+			debug(cmd);
+			self.system.emit('osc_send', self.config.host, self.config.port, cmd,[]);
 		break;
 
 		case 'pbFlash':
@@ -243,15 +205,21 @@ instance.prototype.action = function(action) {
 				type: "i",
 				value: opt.pbFId
 			};
-			self.system.emit('osc_send', self.config.host, self.config.port,'/pb/' + opt.pbId + '/flash' ,[arg]);
+			cmd = '/pb/' + opt.pbId + '/flash';
+			debug(cmd,arg);
+			self.system.emit('osc_send', self.config.host, self.config.port, cmd, [arg]);
 		break;
 
 		case 'pbPause':
-			self.system.emit('osc_send', self.config.host, self.config.port,'/pb/' + opt.pbId + '/pause' ,[]);
+			cmd = '/pb/' + opt.pbId + '/pause';
+			debug(cmd);
+			self.system.emit('osc_send', self.config.host, self.config.port, cmd, []);
 		break;
 
 		case 'pbRelease':
-			self.system.emit('osc_send', self.config.host, self.config.port,'/pb/' + opt.pbId + '/release' ,[]);
+			cmd = '/pb/' + opt.pbId + '/release';
+			debug(cmd);
+			self.system.emit('osc_send', self.config.host, self.config.port, cmd, []);
 		break;
 
 		case 'dbo':
@@ -259,11 +227,15 @@ instance.prototype.action = function(action) {
 				type: "i",
 				value: opt.dboId
 			};
-			self.system.emit('osc_send', self.config.host, self.config.port,'/dbo'  ,[arg]);
+			cmd = '/dbo';
+			debug(cmd,arg)
+			self.system.emit('osc_send', self.config.host, self.config.port, cmd, [arg]);
 		break;
 
 		case 'pbJump':
-		self.system.emit('osc_send', self.config.host, self.config.port,'/pb' + opt.pbId + '/' + opt.cue ,[]);
+			cmd = '/pb/' + opt.pbId + '/' + opt.cue;
+			debug(cmd);
+			self.system.emit('osc_send', self.config.host, self.config.port, cmd, []);
 
 		break;
 
