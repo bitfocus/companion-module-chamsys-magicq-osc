@@ -169,7 +169,7 @@ instance.prototype.actions = function(system) {
 					type:    'dropdown',
 					label:   'On / Off',
 					id:      'dboId',
-					choices: [ { id: '1', label: 'DBO Off' }, { id: '0', label: 'DBO On' } ]
+					choices: [ { id: '0', label: 'DBO Off' }, { id: '1', label: 'DBO On' } ]
 				}
 			]
 		},
