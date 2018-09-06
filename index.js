@@ -161,6 +161,32 @@ instance.prototype.actions = function(system) {
 				}
 			]
 		},
+		'execute':     {
+			label:     'Execute',
+			options: [
+				{
+					type:    'textinput',
+					label:   'Execute Page',
+					id:      'exeP',
+					default: '1',
+					regex:   self.REGEX_NUMBER
+				},
+				{
+					type:    'textinput',
+					label:   'Execute Nr',
+					id:      'exeNr',
+					default: '1',
+					regex:   self.REGEX_NUMBER
+				},
+				{
+					type:    'textinput',
+					label:   'Execute Level: 0 = Release, 1 = Activate, 2-100 = Encoder Level',
+					id:      'exeVal',
+					default: '1',
+					regex:   self.REGEX_NUMBER
+				}
+			]
+		},
 
 		'dbo':     {
 			label:     'Desk Black Out DBO',
@@ -172,7 +198,7 @@ instance.prototype.actions = function(system) {
 					choices: [ { id: '0', label: 'DBO Off' }, { id: '1', label: 'DBO On' } ]
 				}
 			]
-		},
+		}
 	});
 }
 
@@ -239,6 +265,17 @@ instance.prototype.action = function(action) {
 
 		break;
 
+		case 'execute':
+			var arg = {
+				type: "i",
+				value: parseInt(opt.exeVal)
+			};
+			cmd = '/exec/' + opt.exeP + '/' + opt.exeNr;
+			debug(cmd,arg);
+			self.system.emit('osc_send', self.config.host, self.config.port, cmd, [arg]);
+
+		break;
+
 }
 
 };
@@ -246,7 +283,7 @@ instance.prototype.action = function(action) {
 instance.module_info = {
 	label: 'Chamsys MagicQ',
 	id: 'chamsys',
-	version: '0.0.1'
+	version: '0.0.2'
 };
 
 instance_skel.extendedBy(instance);
