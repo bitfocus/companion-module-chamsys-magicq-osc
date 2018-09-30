@@ -276,14 +276,8 @@ instance.prototype.action = function(action) {
 
 		break;
 
-}
+	}
 
-};
-
-instance.module_info = {
-	label: 'Chamsys MagicQ',
-	id: 'chamsys',
-	version: '0.0.2'
 };
 
 instance_skel.extendedBy(instance);
