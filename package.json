@@ -1,17 +1,19 @@
 {
-  "name": "chamsys",
-  "version": "1.0.0",
+	"name": "chamsys",
+	"version": "1.0.1",
 	"api_version": "1.0.0",
-	"keywords": [ "Lighting" ],
+	"keywords": [
+		"Lighting"
+	],
 	"manufacturer": "ChamSys",
 	"product": "MagicQ",
 	"shortname": "magicq",
 	"homepage": "https://secure.chamsys.co.uk/products",
-  "description": "Module to control Chamsys consoles",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "Per Røine <per.roine@gmail.com>",
-  "license": "MIT"
+	"description": "Module to control Chamsys consoles",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "Per Røine <per.roine@gmail.com>",
+	"license": "MIT"
 }
