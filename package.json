@@ -1,5 +1,8 @@
 {
-	"name": "chamsys",
+	"name": "chamsys-magicq-osc",
+	"legacy": [
+		"chamsys"
+	],
 	"version": "1.0.1",
 	"api_version": "1.0.0",
 	"keywords": [
