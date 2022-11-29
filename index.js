@@ -159,7 +159,7 @@ instance.prototype.actions = function (system) {
 					label: 'Cue Nr',
 					id: 'cue',
 					default: '1',
-					regex: self.REGEX_NUMBER,
+					regex: self.REGEX_FLOAT_OR_INT,
 				},
 			],
 		},
