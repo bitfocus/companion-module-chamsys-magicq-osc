@@ -1,29 +1,21 @@
 {
-	"name": "chamsys-magicq-osc",
-	"legacy": [
-		"chamsys"
-	],
-	"version": "1.0.3",
-	"api_version": "1.0.0",
-	"keywords": [
-		"Lighting"
-	],
-	"manufacturer": "ChamSys",
-	"product": "MagicQ",
-	"shortname": "magicq",
-	"homepage": "https://github.com/bitfocus/companion-module-chamsys-magicq-osc#readme",
-	"description": "Module to control Chamsys consoles",
-	"main": "index.js",
-	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1"
-	},
-	"author": "Per Røine <per.roine@gmail.com>",
-	"license": "MIT",
-	"bugs": {
-		"url": "https://github.com/bitfocus/companion-module-chamsys-magicq-osc/issues"
-	},
-	"repository": {
-		"type": "git",
-		"url": "git+https://github.com/bitfocus/companion-module-chamsys-magicq-osc.git"
-	}
+  "name": "chamsys-magicq-osc",
+  "version": "2.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint:raw": "eslint --ext .ts --ext .js --ignore-pattern dist --ignore-pattern pkg",
+    "lint": "yarn lint:raw ."
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bitfocus/companion-module-chamsys-magicq-osc.git"
+  },
+  "dependencies": {
+    "@companion-module/base": "~1.0"
+  },
+  "devDependencies": {
+    "@companion-module/tools": "^1.0.2"
+  }
 }
