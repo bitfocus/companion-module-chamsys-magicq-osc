@@ -182,7 +182,7 @@ class MagicQInstance extends InstanceBase {
 						label: 'Cue Number',
 						id: 'cue',
 						default: '1',
-						regex: Regex.NUMBER,
+						regex: Regex.FLOAT_OR_INT,
 					},
 				],
 				callback: (action) => {
