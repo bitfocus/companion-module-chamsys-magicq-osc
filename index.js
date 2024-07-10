@@ -81,12 +81,15 @@ class MagicQInstance extends InstanceBase {
 						regex: Regex.NUMBER,
 					},
 				],
-				callback: (action) => {
+				callback: async (action) => {
+					let pbId = await this.parseVariablesInString(action.options.pbId)
+					let pbVal = await this.parseVariablesInString(action.options.pbVal)
+
 					var arg = {
 						type: 'i',
-						value: action.options.pbVal,
+						value: pbVal,
 					}
-					sendOSC('/pb/' + action.options.pbId, arg)
+					sendOSC('/pb/' + pbId, arg)
 				},
 			},
 
@@ -101,8 +104,9 @@ class MagicQInstance extends InstanceBase {
 						regex: Regex.NUMBER,
 					},
 				],
-				callback: (action) => {
-					sendOSC('/pb/' + action.options.pbId + '/go')
+				callback: async (action) => {
+					let pbId = await this.parseVariablesInString(action.options.pbId)
+					sendOSC('/pb/' + pbId + '/go')
 				},
 			},
 
@@ -126,12 +130,14 @@ class MagicQInstance extends InstanceBase {
 						],
 					},
 				],
-				callback: (action) => {
+				callback: async (action) => {
+					let pbId = await this.parseVariablesInString(action.options.pbId)
+
 					var arg = {
 						type: 'i',
 						value: action.options.pbFId,
 					}
-					sendOSC('/pb/' + action.options.pbId + '/flash', arg)
+					sendOSC('/pb/' + pbId + '/flash', arg)
 				},
 			},
 
@@ -146,8 +152,9 @@ class MagicQInstance extends InstanceBase {
 						regex: Regex.NUMBER,
 					},
 				],
-				callback: (action) => {
-					sendOSC('/pb/' + action.options.pbId + '/pause')
+				callback: async (action) => {
+					let pbId = await this.parseVariablesInString(action.options.pbId)
+					sendOSC('/pb/' + pbId + '/pause')
 				},
 			},
 
@@ -162,8 +169,9 @@ class MagicQInstance extends InstanceBase {
 						regex: Regex.NUMBER,
 					},
 				],
-				callback: (action) => {
-					sendOSC('/pb/' + action.options.pbId + '/release')
+				callback: async (action) => {
+					let pbId = await this.parseVariablesInString(action.options.pbId)
+					sendOSC('/pb/' + pbId + '/release')
 				},
 			},
 
@@ -185,8 +193,10 @@ class MagicQInstance extends InstanceBase {
 						regex: Regex.FLOAT_OR_INT,
 					},
 				],
-				callback: (action) => {
-					sendOSC('/pb/' + action.options.pbId + '/' + action.options.cue)
+				callback: async (action) => {
+					let pbId = await this.parseVariablesInString(action.options.pbId)
+					let cue = await this.parseVariablesInString(action.options.cue)
+					sendOSC('/pb/' + pbId + '/' + cue)
 				},
 			},
 
@@ -215,12 +225,16 @@ class MagicQInstance extends InstanceBase {
 						regex: Regex.NUMBER,
 					},
 				],
-				callback: (action) => {
+				callback: async (action) => {
+					let exeP = await this.parseVariablesInString(action.options.exeP)
+					let exeNr = await this.parseVariablesInString(action.options.exeNr)
+					let exeVal = await this.parseVariablesInString(action.options.exeVal)
+					
 					var arg = {
 						type: 'i',
-						value: parseInt(action.options.exeVal),
+						value: parseInt(exeVal),
 					}
-					sendOSC('/exec/' + action.options.exeP + '/' + action.options.exeNr, arg)
+					sendOSC('/exec/' + exeP + '/' + exeNr, arg)
 				},
 			},
 
