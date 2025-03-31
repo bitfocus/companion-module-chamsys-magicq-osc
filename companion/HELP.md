@@ -21,3 +21,17 @@ We currently support the following actions, feedbacks and variables:
 | Adjust Execute level         | Adjusts the execute fader level by the given value 0 - 100 %                                               |
 | 10 Scene                     | Control 10Scene buttons / faders                                                                           |
 | RPC Command                  | Send a RPC command to the console                                                                          |
+
+## Feedbacks
+
+| Feedback       | What it does                                                       |
+| -------------- | ------------------------------------------------------------------ |
+| Playback Level | Set feedback based on the playback fader level (0 - 100%)          |
+| Playback Flash | Set feedback based on the playback flash button (on/off)           |
+| Execute Level  | Set feedback based on the execute fader or button level (0 - 100%) |
+
+## Variables
+
+- Playback Level
+- Playback Flash
+- Execute Level
