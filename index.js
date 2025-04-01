@@ -60,7 +60,7 @@ class MagicQInstance extends InstanceBase {
 					color: combineRgb(0, 0, 0),
 					bgcolor: combineRgb(255, 0, 0),
 				},
-				description: 'Set feedback for playback level',
+				description: 'Feedback based on playback level',
 				options: [
 					{
 						type: 'textinput',
@@ -127,7 +127,7 @@ class MagicQInstance extends InstanceBase {
 					color: combineRgb(0, 0, 0),
 					bgcolor: combineRgb(255, 0, 0),
 				},
-				description: 'Set feedback for playback flash',
+				description: 'Feedback based on playback flash status',
 				options: [
 					{
 						type: 'textinput',
@@ -149,7 +149,7 @@ class MagicQInstance extends InstanceBase {
 					color: combineRgb(0, 0, 0),
 					bgcolor: combineRgb(255, 0, 0),
 				},
-				description: 'Set feedback for execute level',
+				description: 'Feedback based on execute level',
 				options: [
 					{
 						type: 'number',
@@ -346,13 +346,14 @@ class MagicQInstance extends InstanceBase {
 				width: 12,
 				label: 'Information',
 				value:
-					'To enable OSC on MagicQ you need to set the mode, and the transmit and/or receive port numbers in Setup, View Settings, Network. Setting a port to 0 disables transmitting/receiving of OSC.',
+					'To enable OSC on MagicQ you need to set the mode, and the transmit/receive port numbers in Setup, View Settings, Network. Setting a port to 0 disables transmitting/receiving of OSC. The OSC TX IP will also need to be set to the IP of this Companion instance to recieve feedback. More information is available in the MagicQ manual here: https://docs.chamsys.co.uk/magicq/open-sound-control/OSC.html',
 			},
 			{
 				type: 'textinput',
 				id: 'host',
 				label: 'Target IP',
 				tooltip: 'The IP of the Chamsys console',
+				default: '127.0.0.1',
 				width: 6,
 				regex: Regex.IP,
 			},
@@ -360,6 +361,8 @@ class MagicQInstance extends InstanceBase {
 				type: 'textinput',
 				id: 'port',
 				label: 'Target Port',
+				tooltip: 'The OSC RX port of the Chamsys console',
+				default: '8000',
 				width: 4,
 				regex: Regex.PORT,
 			},
@@ -367,6 +370,8 @@ class MagicQInstance extends InstanceBase {
 				type: 'textinput',
 				id: 'rxPort',
 				label: 'Feedback Port',
+				tooltip: 'The OSC TX port of the Chamsys console',
+				default: '9000',
 				width: 4,
 				regex: Regex.PORT,
 			},
@@ -377,7 +382,7 @@ class MagicQInstance extends InstanceBase {
 		const sendOSC = (cmd, arg = null) => {
 			if (this.config.host && this.config.port && this.config.port > 0 && this.config.port < 65536) {
 				if (arg) {
-					this.log('debug', cmd + ': ' + arg)
+					this.log('debug', cmd + ': ' + JSON.stringify(arg))
 					this.oscSend(this.config.host, this.config.port, cmd, [arg])
 				} else {
 					this.log('debug', cmd)
@@ -498,20 +503,28 @@ class MagicQInstance extends InstanceBase {
 					},
 					{
 						type: 'dropdown',
-						label: 'On / Off',
+						label: 'Action',
 						id: 'pbFId',
 						choices: [
 							{ id: '1', label: 'Flash On' },
 							{ id: '0', label: 'Flash Off' },
+							{ id: '2', label: 'Flash Toggle' },
 						],
+						default: '1',
 					},
 				],
 				callback: async (action) => {
 					var pbId = await this.parseVariablesInString(action.options.pbId)
+					var flashVal = await this.parseVariablesInString(action.options.pbFId)
+					flashVal = parseInt(flashVal)
 
+					// handle toggle
+					if (flashVal === 2) {
+						flashVal = this.playbacks[pbId].flash === 1 ? 0 : 1
+					}
 					var arg = {
 						type: 'i',
-						value: action.options.pbFId,
+						value: flashVal,
 					}
 					sendOSC('/pb/' + pbId + '/flash', arg)
 					// set the value in the playbacks array since magicQ does not send feedback for OSC commands
@@ -587,18 +600,26 @@ class MagicQInstance extends InstanceBase {
 				options: [
 					{
 						type: 'dropdown',
-						label: 'On / Off',
+						label: 'Action',
 						id: 'dboId',
 						choices: [
 							{ id: '1', label: 'Black Out On' },
 							{ id: '0', label: 'Black Out Off' },
+							{ id: '2', label: 'Black Out Toggle' },
 						],
+						default: '1',
 					},
 				],
-				callback: (action) => {
+				callback: async (action) => {
+					var dboVal = await this.parseVariablesInString(action.options.dboId)
+					dboVal = parseInt(dboVal)
+					// handle toggle
+					if (dboVal === 2) {
+						dboVal = this.playbacks[1].flash === 1 ? 0 : 1
+					}
 					var arg = {
 						type: 'i',
-						value: action.options.dboId,
+						value: dboVal,
 					}
 					sendOSC('/dbo', arg)
 				},
@@ -615,6 +636,7 @@ class MagicQInstance extends InstanceBase {
 							{ id: '0', label: 'Add' },
 							{ id: '1', label: 'Swap' },
 						],
+						default: '0',
 					},
 				],
 				callback: (action) => {
@@ -644,22 +666,41 @@ class MagicQInstance extends InstanceBase {
 						regex: Regex.NUMBER,
 					},
 					{
+						type: 'checkbox',
+						label: 'Toggle?',
+						id: 'exeToggle',
+						default: false,
+						tooltip: 'If checked, this action will just toggle the execute button',
+					},
+					{
 						type: 'textinput',
 						label: 'Execute Level: 0 - 100 %',
 						tooltip: '0 = Release, 1 - 100 = Activate or Fader Level',
 						id: 'exeVal',
 						default: '1',
 						regex: Regex.NUMBER,
+						isVisible: (options) => {
+							return !options.exeToggle
+						},
 					},
 				],
 				callback: async (action) => {
 					var exeP = await this.parseVariablesInString(action.options.exeP)
 					var exeNr = await this.parseVariablesInString(action.options.exeNr)
 					var exeVal = await this.parseVariablesInString(action.options.exeVal)
-
+					var exeToggle = action.options.exeToggle
+					exeVal = parseInt(exeVal)
+					// handle toggle
+					if (exeToggle) {
+						if (this.execs[exeP][exeNr] === undefined) {
+							exeVal = 100
+						} else {
+							exeVal = this.execs[exeP][exeNr] > 0 ? 0 : 100
+						}
+					}
 					var arg = {
-						type: 'i',
-						value: exeVal,
+						type: 'f',
+						value: exeVal / 100,
 					}
 					sendOSC('/exec/' + exeP + '/' + exeNr, arg)
 					// set the value in the execs array since magicQ does not send feedback for OSC commands
@@ -687,14 +728,14 @@ class MagicQInstance extends InstanceBase {
 				options: [
 					{
 						type: 'textinput',
-						label: 'Execute Page',
+						label: 'Execute Page (1-10)',
 						id: 'exeP',
 						default: '1',
 						regex: Regex.NUMBER,
 					},
 					{
 						type: 'textinput',
-						label: 'Execute Nr',
+						label: 'Execute Number',
 						id: 'exeNr',
 						default: '1',
 						regex: Regex.NUMBER,
@@ -721,8 +762,8 @@ class MagicQInstance extends InstanceBase {
 					}
 
 					var arg = {
-						type: 'i',
-						value: exeNewLevel,
+						type: 'f',
+						value: exeNewLevel / 100,
 					}
 					sendOSC('/exec/' + exeP + '/' + exeNr, arg)
 					this.setVariableValues({
