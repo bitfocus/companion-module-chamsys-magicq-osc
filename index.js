@@ -57,8 +57,8 @@ class MagicQInstance extends InstanceBase {
 				type: 'boolean',
 				name: 'Playback Level',
 				defaultStyle: {
-					color: combineRgb(255, 0, 0),
-					bgcolor: combineRgb(0, 0, 0),
+					color: combineRgb(0, 0, 0),
+					bgcolor: combineRgb(255, 0, 0),
 				},
 				description: 'Set feedback for playback level',
 				options: [
@@ -75,6 +75,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbComp',
 						default: 'equal',
 						choices: [
+							{ id: 'isActive', label: 'Playback Active' },
 							{ id: 'equal', label: 'Equal' },
 							{ id: 'notEqual', label: 'Not Equal' },
 							{ id: 'greater', label: 'Greater than' },
@@ -92,6 +93,9 @@ class MagicQInstance extends InstanceBase {
 						max: 100,
 						range: true,
 						step: 1,
+						isVisible: (options) => {
+							return options.pbComp !== 'isActive'
+						},
 					},
 				],
 				callback: (feedback) => {
@@ -120,8 +124,8 @@ class MagicQInstance extends InstanceBase {
 				type: 'boolean',
 				name: 'Playback Flash',
 				defaultStyle: {
-					color: combineRgb(255, 0, 0),
-					bgcolor: combineRgb(0, 0, 0),
+					color: combineRgb(0, 0, 0),
+					bgcolor: combineRgb(255, 0, 0),
 				},
 				description: 'Set feedback for playback flash',
 				options: [
@@ -142,8 +146,8 @@ class MagicQInstance extends InstanceBase {
 				type: 'boolean',
 				name: 'Execute Level',
 				defaultStyle: {
-					color: combineRgb(255, 0, 0),
-					bgcolor: combineRgb(0, 0, 0),
+					color: combineRgb(0, 0, 0),
+					bgcolor: combineRgb(255, 0, 0),
 				},
 				description: 'Set feedback for execute level',
 				options: [
@@ -168,7 +172,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'execComp',
 						default: 'equal',
 						choices: [
-							{ id: 'isActive', label: 'Button Active' },
+							{ id: 'isActive', label: 'Execute Active' },
 							{ id: 'equal', label: 'Equal' },
 							{ id: 'notEqual', label: 'Not Equal' },
 							{ id: 'greater', label: 'Greater than' },
