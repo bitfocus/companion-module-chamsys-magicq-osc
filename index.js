@@ -25,7 +25,6 @@ class MagicQInstance extends InstanceBase {
 	async init(config) {
 		this.config = config
 
-		this.updateStatus('ok')
 		this.updateActions()
 
 		if (this.config.host && this.config.port && this.config.port > 0 && this.config.port < 65536) {
@@ -332,10 +331,12 @@ class MagicQInstance extends InstanceBase {
 
 	async destroy() {
 		this.log('debug', 'destroy')
+		this.osc.close()
 	}
 
 	async configUpdated(config) {
 		this.config = config
+		this.init(config)
 	}
 
 	getConfigFields() {
