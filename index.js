@@ -6,6 +6,7 @@ class MagicQInstance extends InstanceBase {
 		super(internal)
 
 		this.osc = new osc.UDPPort({})
+		this.companionOsc = new osc.UDPPort({})
 
 		// objects for playbacks and executes
 		this.playbacks = []
@@ -25,14 +26,12 @@ class MagicQInstance extends InstanceBase {
 	async init(config) {
 		this.config = config
 
-		this.updateActions()
-
 		if (this.config.host && this.config.port && this.config.port > 0 && this.config.port < 65536) {
 			this.setupOSC()
+			this.updateActions()
+			this.initVariables()
+			this.initFeedbacks()
 		}
-
-		this.initVariables()
-		this.initFeedbacks()
 	}
 
 	async initVariables() {
@@ -280,15 +279,25 @@ class MagicQInstance extends InstanceBase {
 		if (this.osc) {
 			this.osc.close()
 		}
+		if (this.companionOsc) {
+			this.companionOsc.close()
+		}
 		this.osc = new osc.UDPPort({
 			localAddress: '0.0.0.0',
 			localPort: this.config.rxPort,
 			remoteAddress: this.config.host,
 			remotePort: this.config.port,
 		})
+		this.companionOsc = new osc.UDPPort({
+			localAddress: '0.0.0.0',
+			remoteAddress: '127.0.0.1',
+			remotePort: this.config.forwardPort,
+		})
+		this.companionOsc.open()
 		this.osc.on('ready', () => {
 			this.log('debug', 'OSC ready')
 			this.updateStatus(InstanceStatus.Connecting)
+
 			this.sendOSC('/feedback/pb+exec')
 		})
 		this.osc.on('message', (msg) => {
@@ -296,6 +305,15 @@ class MagicQInstance extends InstanceBase {
 			this.updateStatus(InstanceStatus.Ok)
 
 			this.checkVariables(msg)
+
+			// check if we need to forward the message to Companion
+			if (this.config.forwardOSC && this.config.forwardPort) {
+				this.companionOsc.send({
+					address: msg.address,
+					args: msg.args,
+				})
+				this.log('debug', 'Forwarding OSC message to Companion: ' + msg.address + ' ' + msg.args)
+			}
 		})
 		this.osc.on('error', (err) => {
 			this.log('error', 'OSC error: ' + err)
@@ -304,20 +322,10 @@ class MagicQInstance extends InstanceBase {
 		this.osc.open()
 	}
 
-	sendOSC(cmd, arg = null, preferFloat = false) {
+	sendOSC(cmd, args = null) {
 		if (this.config.host && this.config.port && this.config.port > 0 && this.config.port < 65536) {
-			var args = []
-			// check if string, int, or float
-			if (arg) {
-				if (typeof arg === 'string') {
-					args.push({ type: 's', value: arg })
-				} else if (typeof arg === 'number') {
-					if (preferFloat) {
-						args.push({ type: 'f', value: arg })
-					} else {
-						args.push({ type: 'i', value: arg })
-					}
-				}
+			if (args === null) {
+				args = []
 			}
 			this.log('debug', 'sendOSC: ' + cmd + ' ' + JSON.stringify(args))
 			this.osc.send({
@@ -376,24 +384,32 @@ class MagicQInstance extends InstanceBase {
 				width: 4,
 				regex: Regex.PORT,
 			},
+			{
+				type: 'checkbox',
+				id: 'forwardOSC',
+				label: 'Forward OSC messages to Companion',
+				tooltip:
+					'If checked, all OSC messages received from the Chamsys console will be forwarded to Companion at the port below, allowing MagicQ to control Companion with OSC Commands.',
+				default: false,
+				width: 6,
+			},
+			{
+				type: 'textinput',
+				id: 'forwardPort',
+				label: 'Companion OSC Listen Port',
+				tooltip:
+					'The port to forward OSC messages to Companion (you con enable this and find the port in the Companion Settings)',
+				default: '12321',
+				width: 4,
+				regex: Regex.PORT,
+				isVisible: (options) => {
+					return options.forwardOSC
+				},
+			},
 		]
 	}
 
 	updateActions() {
-		const sendOSC = (cmd, arg = null) => {
-			if (this.config.host && this.config.port && this.config.port > 0 && this.config.port < 65536) {
-				if (arg) {
-					this.log('debug', cmd + ': ' + JSON.stringify(arg))
-					this.oscSend(this.config.host, this.config.port, cmd, [arg])
-				} else {
-					this.log('debug', cmd)
-					this.oscSend(this.config.host, this.config.port, cmd)
-				}
-			} else {
-				this.log('error', 'Could not send OSC: host or port not defined')
-			}
-		}
-
 		this.setActionDefinitions({
 			pb: {
 				name: 'Set the playback fader level',
@@ -421,7 +437,7 @@ class MagicQInstance extends InstanceBase {
 						type: 'i',
 						value: pbVal,
 					}
-					sendOSC('/pb/' + pbId, arg)
+					this.sendOSC('/pb/' + pbId, arg)
 					// set the value in the playbacks array since magicQ does not send feedback for OSC commands
 					this.playbacks[pbId].value = pbVal
 					this.setVariableValues({
@@ -465,7 +481,7 @@ class MagicQInstance extends InstanceBase {
 						type: 'i',
 						value: pbNewLevel,
 					}
-					sendOSC('/pb/' + pbId, arg)
+					this.sendOSC('/pb/' + pbId, arg)
 					// set the value in the playbacks array since magicQ does not send feedback for OSC commands
 					this.playbacks[pbId].value = pbNewLevel
 					this.setVariableValues({
@@ -488,7 +504,7 @@ class MagicQInstance extends InstanceBase {
 				],
 				callback: async (action) => {
 					var pbId = await this.parseVariablesInString(action.options.pbId)
-					sendOSC('/pb/' + pbId + '/go')
+					this.sendOSC('/pb/' + pbId + '/go')
 				},
 			},
 
@@ -527,7 +543,7 @@ class MagicQInstance extends InstanceBase {
 						type: 'i',
 						value: flashVal,
 					}
-					sendOSC('/pb/' + pbId + '/flash', arg)
+					this.sendOSC('/pb/' + pbId + '/flash', arg)
 					// set the value in the playbacks array since magicQ does not send feedback for OSC commands
 					this.playbacks[pbId].flash = action.options.pbFId
 					this.setVariableValues({
@@ -550,7 +566,7 @@ class MagicQInstance extends InstanceBase {
 				],
 				callback: async (action) => {
 					var pbId = await this.parseVariablesInString(action.options.pbId)
-					sendOSC('/pb/' + pbId + '/pause')
+					this.sendOSC('/pb/' + pbId + '/pause')
 				},
 			},
 
@@ -567,7 +583,7 @@ class MagicQInstance extends InstanceBase {
 				],
 				callback: async (action) => {
 					var pbId = await this.parseVariablesInString(action.options.pbId)
-					sendOSC('/pb/' + pbId + '/release')
+					this.sendOSC('/pb/' + pbId + '/release')
 				},
 			},
 
@@ -592,7 +608,7 @@ class MagicQInstance extends InstanceBase {
 				callback: async (action) => {
 					var pbId = await this.parseVariablesInString(action.options.pbId)
 					var cue = await this.parseVariablesInString(action.options.cue)
-					sendOSC('/pb/' + pbId + '/' + cue)
+					this.sendOSC('/pb/' + pbId + '/' + cue)
 				},
 			},
 
@@ -622,7 +638,7 @@ class MagicQInstance extends InstanceBase {
 						type: 'i',
 						value: dboVal,
 					}
-					sendOSC('/dbo', arg)
+					this.sendOSC('/dbo', arg)
 				},
 			},
 
@@ -645,7 +661,7 @@ class MagicQInstance extends InstanceBase {
 						type: 'i',
 						value: action.options.swapId,
 					}
-					sendOSC('/swap', arg)
+					this.sendOSC('/swap', arg)
 				},
 			},
 
@@ -703,7 +719,7 @@ class MagicQInstance extends InstanceBase {
 						type: 'f',
 						value: exeVal / 100,
 					}
-					sendOSC('/exec/' + exeP + '/' + exeNr, arg)
+					this.sendOSC('/exec/' + exeP + '/' + exeNr, arg)
 					// set the value in the execs array since magicQ does not send feedback for OSC commands
 					if (this.execs[exeP] === undefined) {
 						this.execs[exeP] = []
@@ -766,7 +782,7 @@ class MagicQInstance extends InstanceBase {
 						type: 'f',
 						value: exeNewLevel / 100,
 					}
-					sendOSC('/exec/' + exeP + '/' + exeNr, arg)
+					this.sendOSC('/exec/' + exeP + '/' + exeNr, arg)
 					this.setVariableValues({
 						['exec' + exeP + '_' + exeNr]: exeNewLevel,
 					})
@@ -809,7 +825,7 @@ class MagicQInstance extends InstanceBase {
 						type: 'f',
 						value: tenSceneVal,
 					}
-					sendOSC('/10scene/' + tenSceneItem + '/' + tenSceneZone, arg)
+					this.sendOSC('/10scene/' + tenSceneItem + '/' + tenSceneZone, arg)
 				},
 			},
 
@@ -830,7 +846,7 @@ class MagicQInstance extends InstanceBase {
 						type: 's',
 						value: rpcCmd,
 					}
-					sendOSC('/rpc', arg)
+					this.sendOSC('/rpc', arg)
 				},
 			},
 		})
