@@ -771,6 +771,13 @@ class MagicQInstance extends InstanceBase {
 					var exeP = await this.parseVariablesInString(action.options.exeP)
 					var exeNr = await this.parseVariablesInString(action.options.exeNr)
 					var exeVal = await this.parseVariablesInString(action.options.exeVal)
+					// chack if we have a current value of the execute
+					if (this.execs[exeP] === undefined) {
+						this.execs[exeP] = []
+					}
+					if (this.execs[exeP][exeNr] === undefined) {
+						this.execs[exeP][exeNr] = 0
+					}
 					// get the current value of the playback
 					var exeNewLevel = this.execs[exeP][exeNr] + parseInt(exeVal)
 					// check if the new level is greater than 100 or less than 0
