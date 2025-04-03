@@ -103,6 +103,8 @@ class MagicQInstance extends InstanceBase {
 					var pbLevel = this.playbacks[pbId].value
 
 					switch (pbComp) {
+						case 'isActive':
+							return pbLevel > 0
 						case 'equal':
 							return pbLevel === parseInt(pbVal)
 						case 'notEqual':
