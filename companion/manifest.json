@@ -3,7 +3,7 @@
 	"name": "chamsys-magicq-osc",
 	"shortname": "magicq",
 	"description": "Module to control Chamsys consoles",
-	"version": "2.0.0",
+	"version": "3.0.0",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-chamsys-magicq-osc.git",
 	"bugs": "https://github.com/bitfocus/companion-module-chamsys-magicq-osc/issues",
@@ -13,9 +13,7 @@
 			"email": "per.roine@gmail.com"
 		}
 	],
-	"legacyIds": [
-		"chamsys"
-	],
+	"legacyIds": ["chamsys"],
 	"runtime": {
 		"type": "node18",
 		"api": "nodejs-ipc",
@@ -23,10 +21,6 @@
 		"entrypoint": "../index.js"
 	},
 	"manufacturer": "ChamSys",
-	"products": [
-		"MagicQ"
-	],
-	"keywords": [
-		"Lighting"
-	]
+	"products": ["MagicQ"],
+	"keywords": ["Lighting"]
 }
