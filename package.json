@@ -13,10 +13,10 @@
     "url": "git+https://github.com/bitfocus/companion-module-chamsys-magicq-osc.git"
   },
   "dependencies": {
-    "@companion-module/base": "~1.0",
+    "@companion-module/base": "~1.11",
 		"osc": "^2.4.5"
   },
   "devDependencies": {
-    "@companion-module/tools": "^1.0.2"
+    "@companion-module/tools": "^2.3.0"
   }
 }
