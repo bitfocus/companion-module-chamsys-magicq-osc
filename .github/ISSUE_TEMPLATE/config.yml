@@ -2,7 +2,7 @@ blank_issues_enabled: false
 contact_links:
   - name: Bug or Feature for Companion itself
     url: https://github.com/bitfocus/companion/issues
-    about: Report it against the companion itself, to get the relevant people notified.
+    about: Report it against Companion itself, to get the relevant people notified.
   - name: Bug or Feature for MagicQ itself
     url: https://secure.chamsys.co.uk/bugtracker
     about: Report it against MagicQ itself, to get the relevant people notified.
