@@ -3,7 +3,7 @@
 	"name": "chamsys-magicq-osc",
 	"shortname": "magicq",
 	"description": "Module to control Chamsys consoles",
-	"version": "3.0.0",
+	"version": "3.0.2",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-chamsys-magicq-osc.git",
 	"bugs": "https://github.com/bitfocus/companion-module-chamsys-magicq-osc/issues",
