@@ -545,7 +545,7 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.this.clamp(parseInt(await this.parseVariablesInString(action.options.pbId)), 1, 10)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
 					var flashVal = this.clamp(parseInt(action.options.pbFId), 0, 2)
 
 					// handle toggle
