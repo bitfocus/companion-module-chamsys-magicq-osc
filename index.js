@@ -98,8 +98,8 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: (feedback) => {
-					var pbId = clamp(parseInt(feedback.options.pbId), 1, 10)
-					var pbVal = clamp(parseInt(feedback.options.pbVal), 0, 100)
+					var pbId = this.clamp(parseInt(feedback.options.pbId), 1, 10)
+					var pbVal = this.clamp(parseInt(feedback.options.pbVal), 0, 100)
 					var pbComp = feedback.options.pbComp
 					var pbLevel = this.playbacks[pbId].value
 
@@ -140,7 +140,7 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: (feedback) => {
-					var pbId = clamp(parseInt(feedback.options.pbId), 1, 10)
+					var pbId = this.clamp(parseInt(feedback.options.pbId), 1, 10)
 					return this.playbacks[pbId].flash === 1
 				},
 			},
@@ -195,9 +195,9 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: (feedback) => {
-					var execPage = clamp(parseInt(feedback.options.execPage), 1, 10)
+					var execPage = this.clamp(parseInt(feedback.options.execPage), 1, 10)
 					var execNumber = parseInt(feedback.options.execNumber)
-					var execVal = clamp(parseInt(feedback.options.execVal), 0, 100)
+					var execVal = this.clamp(parseInt(feedback.options.execVal), 0, 100)
 					var execComp = feedback.options.execComp
 					var execLevel = this.execs[execPage][execNumber]
 
@@ -440,8 +440,8 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = clamp(parseInt(action.options.pbId), 1, 10)
-					var pbVal = clamp(parseInt(action.options.pbVal), 0, 100)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
+					var pbVal = this.clamp(parseInt(action.options.pbVal), 0, 100)
 
 					var arg = {
 						type: 'i',
@@ -478,8 +478,8 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = clamp(parseInt(action.options.pbId), 1, 10)
-					var pbVal = clamp(parseInt(action.options.pbVal), -100, 100)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
+					var pbVal = this.clamp(parseInt(action.options.pbVal), -100, 100)
 					// get the current value of the playback
 					var pbNewLevel = this.playbacks[pbId].value + pbVal
 					// check if the new level is greater than 100 or less than 0
@@ -516,7 +516,7 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = clamp(parseInt(action.options.pbId), 1, 10)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
 					this.sendOSC('/pb/' + pbId + '/go')
 				},
 			},
@@ -545,8 +545,8 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.clamp(parseInt(await this.parseVariablesInString(action.options.pbId)), 1, 10)
-					var flashVal = clamp(parseInt(action.options.pbFId), 0, 2)
+					var pbId = this.this.clamp(parseInt(await this.parseVariablesInString(action.options.pbId)), 1, 10)
+					var flashVal = this.clamp(parseInt(action.options.pbFId), 0, 2)
 
 					// handle toggle
 					if (flashVal === 2) {
@@ -579,7 +579,7 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = clamp(parseInt(action.options.pbId), 1, 10)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
 					this.sendOSC('/pb/' + pbId + '/pause')
 				},
 			},
@@ -597,7 +597,7 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = clamp(parseInt(action.options.pbId), 1, 10)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
 					this.sendOSC('/pb/' + pbId + '/release')
 				},
 			},
@@ -623,7 +623,7 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = clamp(parseInt(action.options.pbId), 1, 10)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
 					var cue = parseFloat(action.options.cue)
 					this.sendOSC('/pb/' + pbId + '/' + cue)
 				},
@@ -645,7 +645,7 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var dboVal = clamp(parseInt(action.options.dboId), 0, 2)
+					var dboVal = this.clamp(parseInt(action.options.dboId), 0, 2)
 					// handle toggle
 					if (dboVal === 2) {
 						dboVal = this.playbacks[1].flash === 1 ? 0 : 1
@@ -721,7 +721,7 @@ class MagicQInstance extends InstanceBase {
 				callback: async (action) => {
 					var exeP = parseInt(action.options.exeP)
 					var exeNr = parseInt(action.options.exeNr)
-					var exeVal = clamp(parseInt(action.options.exeVal), 0, 100)
+					var exeVal = this.clamp(parseInt(action.options.exeVal), 0, 100)
 					var exeToggle = action.options.exeToggle
 					// handle toggle
 					if (exeToggle) {
@@ -785,9 +785,9 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var exeP = clamp(parseInt(action.options.exeP), 1, 10)
-					var exeNr = clamp(parseInt(action.options.exeNr), 1, 100)
-					var exeVal = clamp(parseInt(action.options.exeVal), -100, 100)
+					var exeP = this.clamp(parseInt(action.options.exeP), 1, 10)
+					var exeNr = this.clamp(parseInt(action.options.exeNr), 1, 100)
+					var exeVal = this.clamp(parseInt(action.options.exeVal), -100, 100)
 					// chack if we have a current value of the execute
 					if (this.execs[exeP] === undefined) {
 						this.execs[exeP] = []
