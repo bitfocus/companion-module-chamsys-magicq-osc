@@ -49,6 +49,10 @@ class MagicQInstance extends InstanceBase {
 		this.setVariableDefinitions(this.variables)
 	}
 
+	clamp(value, min, max) {
+		return Math.min(Math.max(value, min), max)
+	}
+
 	async initFeedbacks() {
 		this.setFeedbackDefinitions({
 			pb: {
@@ -66,6 +70,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'dropdown',
@@ -83,22 +88,18 @@ class MagicQInstance extends InstanceBase {
 						],
 					},
 					{
-						type: 'number',
+						type: 'textinput',
 						label: 'Playback value (0-100)',
 						id: 'pbVal',
-						default: 0,
-						min: 0,
-						max: 100,
-						range: true,
-						step: 1,
-						isVisible: (options) => {
-							return options.pbComp !== 'isActive'
-						},
+						default: '0',
+						regex: Regex.NUMBER,
+						useVariables: true,
+						isVisibleExpression: '$(options:pbComp) != "isActive"',
 					},
 				],
 				callback: (feedback) => {
-					var pbId = feedback.options.pbId
-					var pbVal = feedback.options.pbVal
+					var pbId = this.clamp(parseInt(feedback.options.pbId), 1, 10)
+					var pbVal = this.clamp(parseInt(feedback.options.pbVal), 0, 100)
 					var pbComp = feedback.options.pbComp
 					var pbLevel = this.playbacks[pbId].value
 
@@ -106,17 +107,17 @@ class MagicQInstance extends InstanceBase {
 						case 'isActive':
 							return pbLevel > 0
 						case 'equal':
-							return pbLevel === parseInt(pbVal)
+							return pbLevel === pbVal
 						case 'notEqual':
-							return pbLevel !== parseInt(pbVal)
+							return pbLevel !== pbVal
 						case 'greater':
-							return pbLevel > parseInt(pbVal)
+							return pbLevel > pbVal
 						case 'greaterEqual':
-							return pbLevel >= parseInt(pbVal)
+							return pbLevel >= pbVal
 						case 'less':
-							return pbLevel < parseInt(pbVal)
+							return pbLevel < pbVal
 						case 'lessEqual':
-							return pbLevel <= parseInt(pbVal)
+							return pbLevel <= pbVal
 					}
 				},
 			},
@@ -135,10 +136,11 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 				],
 				callback: (feedback) => {
-					var pbId = feedback.options.pbId
+					var pbId = this.clamp(parseInt(feedback.options.pbId), 1, 10)
 					return this.playbacks[pbId].flash === 1
 				},
 			},
@@ -152,19 +154,20 @@ class MagicQInstance extends InstanceBase {
 				description: 'Feedback based on execute level',
 				options: [
 					{
-						type: 'number',
+						type: 'textinput',
 						label: 'Execute Page',
 						id: 'execPage',
-						default: 1,
-						min: 1,
-						max: 10,
+						default: '1',
+						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
-						type: 'number',
+						type: 'textinput',
 						label: 'Execute Number',
 						id: 'execNumber',
-						default: 1,
-						min: 1,
+						default: '1',
+						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'dropdown',
@@ -182,23 +185,19 @@ class MagicQInstance extends InstanceBase {
 						],
 					},
 					{
-						type: 'number',
+						type: 'textinput',
 						label: 'Execute value (0-100)',
 						id: 'execVal',
-						default: 0,
-						min: 0,
-						max: 100,
-						range: true,
-						step: 1,
-						isVisible: (options) => {
-							return options.execComp !== 'isActive'
-						},
+						default: '0',
+						regex: Regex.NUMBER,
+						useVariables: true,
+						isVisibleExpression: '$(options:execComp) != "isActive"',
 					},
 				],
 				callback: (feedback) => {
-					var execPage = feedback.options.execPage
-					var execNumber = feedback.options.execNumber
-					var execVal = feedback.options.execVal
+					var execPage = this.clamp(parseInt(feedback.options.execPage), 1, 10)
+					var execNumber = parseInt(feedback.options.execNumber)
+					var execVal = this.clamp(parseInt(feedback.options.execVal), 0, 100)
 					var execComp = feedback.options.execComp
 					var execLevel = this.execs[execPage][execNumber]
 
@@ -206,17 +205,17 @@ class MagicQInstance extends InstanceBase {
 						case 'isActive':
 							return execLevel > 0
 						case 'equal':
-							return execLevel === parseInt(execVal)
+							return execLevel === execVal
 						case 'notEqual':
-							return execLevel !== parseInt(execVal)
+							return execLevel !== execVal
 						case 'greater':
-							return execLevel > parseInt(execVal)
+							return execLevel > execVal
 						case 'greaterEqual':
-							return execLevel >= parseInt(execVal)
+							return execLevel >= execVal
 						case 'less':
-							return execLevel < parseInt(execVal)
+							return execLevel < execVal
 						case 'lessEqual':
-							return execLevel <= parseInt(execVal)
+							return execLevel <= execVal
 					}
 				},
 			},
@@ -378,6 +377,13 @@ class MagicQInstance extends InstanceBase {
 				regex: Regex.PORT,
 			},
 			{
+				type: 'checkbox',
+				id: 'enableFeedback',
+				label: 'Enable Feedback',
+				tooltip: 'Requires feedback to be enabled on the Chamsys console OSC settings',
+				default: true,
+			},
+			{
 				type: 'textinput',
 				id: 'rxPort',
 				label: 'Feedback Port',
@@ -385,6 +391,7 @@ class MagicQInstance extends InstanceBase {
 				default: '9000',
 				width: 4,
 				regex: Regex.PORT,
+				isVisibleExpression: '$(options:enableFeedback) == true',
 			},
 			{
 				type: 'checkbox',
@@ -394,6 +401,7 @@ class MagicQInstance extends InstanceBase {
 					'If checked, all OSC messages received from the Chamsys console will be forwarded to Companion at the port below, allowing MagicQ to control Companion with OSC Commands.',
 				default: false,
 				width: 6,
+				isVisibleExpression: '$(options:enableFeedback) == true',
 			},
 			{
 				type: 'textinput',
@@ -404,9 +412,7 @@ class MagicQInstance extends InstanceBase {
 				default: '12321',
 				width: 4,
 				regex: Regex.PORT,
-				isVisible: (options) => {
-					return options.forwardOSC
-				},
+				isVisibleExpression: '$(options:forwardOSC) == true && $(options:enableFeedback) == true',
 			},
 		]
 	}
@@ -422,6 +428,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'textinput',
@@ -429,11 +436,12 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbVal',
 						default: '',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var pbId = await this.parseVariablesInString(action.options.pbId)
-					var pbVal = await this.parseVariablesInString(action.options.pbVal)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
+					var pbVal = this.clamp(parseInt(action.options.pbVal), 0, 100)
 
 					var arg = {
 						type: 'i',
@@ -458,6 +466,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'textinput',
@@ -465,13 +474,14 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbVal',
 						default: '',
 						regex: Regex.SIGNED_NUMBER,
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var pbId = await this.parseVariablesInString(action.options.pbId)
-					var pbVal = await this.parseVariablesInString(action.options.pbVal)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
+					var pbVal = this.clamp(parseInt(action.options.pbVal), -100, 100)
 					// get the current value of the playback
-					var pbNewLevel = this.playbacks[pbId].value + parseInt(pbVal)
+					var pbNewLevel = this.playbacks[pbId].value + pbVal
 					// check if the new level is greater than 100 or less than 0
 					if (pbNewLevel > 100) {
 						pbNewLevel = 100
@@ -502,10 +512,11 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var pbId = await this.parseVariablesInString(action.options.pbId)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
 					this.sendOSC('/pb/' + pbId + '/go')
 				},
 			},
@@ -519,6 +530,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'dropdown',
@@ -533,9 +545,8 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = await this.parseVariablesInString(action.options.pbId)
-					var flashVal = await this.parseVariablesInString(action.options.pbFId)
-					flashVal = parseInt(flashVal)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
+					var flashVal = this.clamp(parseInt(action.options.pbFId), 0, 2)
 
 					// handle toggle
 					if (flashVal === 2) {
@@ -564,10 +575,11 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var pbId = await this.parseVariablesInString(action.options.pbId)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
 					this.sendOSC('/pb/' + pbId + '/pause')
 				},
 			},
@@ -581,10 +593,11 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var pbId = await this.parseVariablesInString(action.options.pbId)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
 					this.sendOSC('/pb/' + pbId + '/release')
 				},
 			},
@@ -598,6 +611,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'pbId',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'textinput',
@@ -605,11 +619,12 @@ class MagicQInstance extends InstanceBase {
 						id: 'cue',
 						default: '1',
 						regex: Regex.FLOAT_OR_INT,
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var pbId = await this.parseVariablesInString(action.options.pbId)
-					var cue = await this.parseVariablesInString(action.options.cue)
+					var pbId = this.clamp(parseInt(action.options.pbId), 1, 10)
+					var cue = parseFloat(action.options.cue)
 					this.sendOSC('/pb/' + pbId + '/' + cue)
 				},
 			},
@@ -630,8 +645,7 @@ class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var dboVal = await this.parseVariablesInString(action.options.dboId)
-					dboVal = parseInt(dboVal)
+					var dboVal = this.clamp(parseInt(action.options.dboId), 0, 2)
 					// handle toggle
 					if (dboVal === 2) {
 						dboVal = this.playbacks[1].flash === 1 ? 0 : 1
@@ -676,6 +690,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'exeP',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'textinput',
@@ -683,6 +698,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'exeNr',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'checkbox',
@@ -698,17 +714,15 @@ class MagicQInstance extends InstanceBase {
 						id: 'exeVal',
 						default: '1',
 						regex: Regex.NUMBER,
-						isVisible: (options) => {
-							return !options.exeToggle
-						},
+						useVariables: true,
+						isVisibleExpression: '!$(options:exeToggle)',
 					},
 				],
 				callback: async (action) => {
-					var exeP = await this.parseVariablesInString(action.options.exeP)
-					var exeNr = await this.parseVariablesInString(action.options.exeNr)
-					var exeVal = await this.parseVariablesInString(action.options.exeVal)
+					var exeP = parseInt(action.options.exeP)
+					var exeNr = parseInt(action.options.exeNr)
+					var exeVal = this.clamp(parseInt(action.options.exeVal), 0, 100)
 					var exeToggle = action.options.exeToggle
-					exeVal = parseInt(exeVal)
 					// handle toggle
 					if (exeToggle) {
 						if (this.execs[exeP][exeNr] === undefined) {
@@ -751,6 +765,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'exeP',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'textinput',
@@ -758,6 +773,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'exeNr',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'textinput',
@@ -765,12 +781,13 @@ class MagicQInstance extends InstanceBase {
 						id: 'exeVal',
 						default: '',
 						regex: Regex.SIGNED_NUMBER,
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var exeP = await this.parseVariablesInString(action.options.exeP)
-					var exeNr = await this.parseVariablesInString(action.options.exeNr)
-					var exeVal = await this.parseVariablesInString(action.options.exeVal)
+					var exeP = this.clamp(parseInt(action.options.exeP), 1, 10)
+					var exeNr = this.clamp(parseInt(action.options.exeNr), 1, 100)
+					var exeVal = this.clamp(parseInt(action.options.exeVal), -100, 100)
 					// chack if we have a current value of the execute
 					if (this.execs[exeP] === undefined) {
 						this.execs[exeP] = []
@@ -809,6 +826,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'tenSceneItem',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'textinput',
@@ -816,6 +834,7 @@ class MagicQInstance extends InstanceBase {
 						id: 'tenSceneZone',
 						default: '1',
 						regex: Regex.NUMBER,
+						useVariables: true,
 					},
 					{
 						type: 'textinput',
@@ -823,12 +842,13 @@ class MagicQInstance extends InstanceBase {
 						id: 'tenSceneVal',
 						default: '1',
 						regex: Regex.FLOAT_OR_INT,
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var tenSceneItem = await this.parseVariablesInString(action.options.tenSceneItem)
-					var tenSceneZone = await this.parseVariablesInString(action.options.tenSceneZone)
-					var tenSceneVal = await this.parseVariablesInString(action.options.tenSceneVal)
+					var tenSceneItem = parseInt(action.options.tenSceneItem)
+					var tenSceneZone = parseInt(action.options.tenSceneZone)
+					var tenSceneVal = parseFloat(action.options.tenSceneVal)
 
 					var arg = {
 						type: 'f',
@@ -846,10 +866,11 @@ class MagicQInstance extends InstanceBase {
 						label: 'RPC Command',
 						id: 'rpcCmd',
 						default: '',
+						useVariables: true,
 					},
 				],
 				callback: async (action) => {
-					var rpcCmd = await this.parseVariablesInString(action.options.rpcCmd)
+					var rpcCmd = action.options.rpcCmd
 
 					var arg = {
 						type: 's',
