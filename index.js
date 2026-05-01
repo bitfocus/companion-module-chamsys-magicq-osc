@@ -1,7 +1,7 @@
-const { InstanceBase, Regex, runEntrypoint, InstanceStatus, combineRgb } = require('@companion-module/base')
-const osc = require('osc')
+import { InstanceBase, Regex, InstanceStatus, combineRgb } from '@companion-module/base'
+import osc from 'osc'
 
-class MagicQInstance extends InstanceBase {
+export default class MagicQInstance extends InstanceBase {
 	constructor(internal) {
 		super(internal)
 
@@ -20,7 +20,7 @@ class MagicQInstance extends InstanceBase {
 		for (var i = 1; i <= 10; i++) {
 			this.execs[i] = []
 		}
-		this.variables = []
+		this.variables = {}
 	}
 
 	async init(config) {
@@ -36,14 +36,9 @@ class MagicQInstance extends InstanceBase {
 
 	async initVariables() {
 		for (var i = 1; i <= 10; i++) {
-			this.variables.push({
-				variableId: 'pb' + i,
-				name: 'Playback ' + i + ' Level',
-			})
-			this.variables.push({
-				variableId: 'pb' + i + '_flash',
-				name: 'Playback ' + i + ' Flash',
-			})
+			this.variables['pb' + i] = { name: 'Playback ' + i + ' Level' }
+
+			this.variables['pb' + i + '_flash'] = { name: 'Playback ' + i + ' Flash' }
 		}
 
 		this.setVariableDefinitions(this.variables)
@@ -235,6 +230,7 @@ class MagicQInstance extends InstanceBase {
 			this.setVariableValues({
 				['pb' + pbId]: pbValPercent,
 			})
+			this.checkFeedbacks('pb')
 			this.log('debug', 'pbId: ' + pbId + ' value: ' + pbValPercent)
 		} else if (pbFlashRegex.test(msg.address)) {
 			const pbId = msg.address.match(pbFlashRegex)[1]
@@ -243,6 +239,7 @@ class MagicQInstance extends InstanceBase {
 			this.setVariableValues({
 				['pb' + pbId + '_flash']: pbFlash,
 			})
+			this.checkFeedbacks('pbFlash')
 			this.log('debug', 'pbId: ' + pbId + ' flash: ' + pbFlash)
 		} else if (execRegex.test(msg.address)) {
 			const execPage = msg.address.match(execRegex)[1]
@@ -256,10 +253,7 @@ class MagicQInstance extends InstanceBase {
 			}
 			if (this.execs[execPage][execNr] === undefined) {
 				// need to add the variable to companion
-				this.variables.push({
-					variableId: 'exec' + execPage + '_' + execNr,
-					name: 'Execute Page ' + execPage + ', Exec ' + execNr,
-				})
+				this.variables['exec' + execPage + '_' + execNr] = { name: 'Execute Page ' + execPage + ', Exec ' + execNr }
 				this.setVariableDefinitions(this.variables)
 			}
 			this.setVariableValues({
@@ -267,11 +261,10 @@ class MagicQInstance extends InstanceBase {
 			})
 			// set the value in the execs array
 			this.execs[execPage][execNr] = execValPercent
+			this.checkFeedbacks('exec')
 		} else {
 			return
 		}
-		// update feedbacks
-		this.checkFeedbacks()
 	}
 
 	async setupOSC() {
@@ -453,7 +446,7 @@ class MagicQInstance extends InstanceBase {
 					this.setVariableValues({
 						['pb' + pbId]: pbVal,
 					})
-					this.checkFeedbacks()
+					this.checkFeedbacks('pb')
 				},
 			},
 
@@ -499,7 +492,7 @@ class MagicQInstance extends InstanceBase {
 					this.setVariableValues({
 						['pb' + pbId]: pbNewLevel,
 					})
-					this.checkFeedbacks()
+					this.checkFeedbacks('pb')
 				},
 			},
 
@@ -562,7 +555,7 @@ class MagicQInstance extends InstanceBase {
 					this.setVariableValues({
 						['pb' + pbId + '_flash']: action.options.pbFId,
 					})
-					this.checkFeedbacks()
+					this.checkFeedbacks('pbFlash')
 				},
 			},
 
@@ -746,13 +739,17 @@ class MagicQInstance extends InstanceBase {
 							variableId: 'exec' + exeP + '_' + exeNr,
 							name: 'Execute Page ' + exeP + ', Exec ' + exeNr,
 						})
-						this.setVariableDefinitions(this.variables)
+						const variableDefinitions = {}
+						for (const variable of this.variables) {
+							variableDefinitions[variable.variableId] = { name: variable.name }
+						}
+						this.setVariableDefinitions(variableDefinitions)
 					}
 					this.setVariableValues({
 						['exec' + exeP + '_' + exeNr]: exeVal,
 					})
 					this.execs[exeP][exeNr] = exeVal
-					this.checkFeedbacks()
+					this.checkFeedbacks('exec')
 				},
 			},
 
@@ -813,7 +810,7 @@ class MagicQInstance extends InstanceBase {
 						['exec' + exeP + '_' + exeNr]: exeNewLevel,
 					})
 					this.execs[exeP][exeNr] = exeNewLevel
-					this.checkFeedbacks()
+					this.checkFeedbacks('exec')
 				},
 			},
 
@@ -883,4 +880,4 @@ class MagicQInstance extends InstanceBase {
 	}
 }
 
-runEntrypoint(MagicQInstance, [])
+export const UpgradeScripts = []
