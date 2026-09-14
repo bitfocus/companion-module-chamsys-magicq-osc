@@ -5,8 +5,9 @@ export default class MagicQInstance extends InstanceBase {
 	constructor(internal) {
 		super(internal)
 
-		this.osc = new osc.UDPPort({})
-		this.companionOsc = new osc.UDPPort({})
+		// sockets are created in setupOSC(), once the config is known
+		this.osc = null
+		this.companionOsc = null
 
 		// objects for playbacks and executes
 		this.playbacks = []
@@ -26,15 +27,17 @@ export default class MagicQInstance extends InstanceBase {
 	async init(config) {
 		this.config = config
 
-		if (this.config.host && this.config.port && this.config.port > 0 && this.config.port < 65536) {
-			this.setupOSC()
-			this.updateActions()
-			this.initVariables()
-			this.initFeedbacks()
-		}
+		// Definitions do not depend on the connection, so always register them.
+		// Otherwise a bad config would leave buttons with no actions to call.
+		this.updateActions()
+		this.initVariables()
+		this.initFeedbacks()
+
+		this.setupOSC()
 	}
 
 	async initVariables() {
+		this.variables = {}
 		for (var i = 1; i <= 10; i++) {
 			this.variables['pb' + i] = { name: 'Playback ' + i + ' Level' }
 
@@ -46,6 +49,27 @@ export default class MagicQInstance extends InstanceBase {
 
 	clamp(value, min, max) {
 		return Math.min(Math.max(value, min), max)
+	}
+
+	// Config values arrive as strings, so coerce and validate before handing
+	// them to dgram. Returns undefined when the value is not a usable port.
+	parsePort(value) {
+		const port = parseInt(value, 10)
+		return Number.isInteger(port) && port > 0 && port < 65536 ? port : undefined
+	}
+
+	// Execute variables are not known up front, so they are registered the
+	// first time a given page/number is seen - from feedback or from an action.
+	ensureExecVariable(execPage, execNr) {
+		if (this.execs[execPage] === undefined) {
+			this.execs[execPage] = []
+		}
+
+		const variableId = 'exec' + execPage + '_' + execNr
+		if (this.variables[variableId] === undefined) {
+			this.variables[variableId] = { name: 'Execute Page ' + execPage + ', Exec ' + execNr }
+			this.setVariableDefinitions(this.variables)
+		}
 	}
 
 	async initFeedbacks() {
@@ -247,15 +271,7 @@ export default class MagicQInstance extends InstanceBase {
 			const execVal = parseFloat(msg.args)
 			const execValPercent = Math.round(execVal * 100)
 			this.log('debug', 'execPage: ' + execPage + ' execNr: ' + execNr + ' value: ' + execValPercent)
-			// check if execPage and execNr exist yet
-			if (this.execs[execPage] === undefined) {
-				this.execs[execPage] = []
-			}
-			if (this.execs[execPage][execNr] === undefined) {
-				// need to add the variable to companion
-				this.variables['exec' + execPage + '_' + execNr] = { name: 'Execute Page ' + execPage + ', Exec ' + execNr }
-				this.setVariableDefinitions(this.variables)
-			}
+			this.ensureExecVariable(execPage, execNr)
 			this.setVariableValues({
 				['exec' + execPage + '_' + execNr]: execValPercent,
 			})
@@ -267,41 +283,98 @@ export default class MagicQInstance extends InstanceBase {
 		}
 	}
 
+	closeOSC() {
+		for (const port of [this.osc, this.companionOsc]) {
+			if (!port) {
+				continue
+			}
+			try {
+				port.close()
+			} catch (err) {
+				this.log('debug', 'Error closing OSC port: ' + err)
+			}
+		}
+		this.osc = null
+		this.companionOsc = null
+	}
+
 	async setupOSC() {
+		this.closeOSC()
+
+		const remotePort = this.parsePort(this.config.port)
+		if (!this.config.host || remotePort === undefined) {
+			this.updateStatus(InstanceStatus.BadConfig, 'Target IP and port must be set')
+			return
+		}
+
+		const feedbackEnabled = !!this.config.enableFeedback
+		const rxPort = this.parsePort(this.config.rxPort)
+		if (feedbackEnabled && rxPort === undefined) {
+			this.updateStatus(InstanceStatus.BadConfig, 'Feedback port must be set when feedback is enabled')
+			return
+		}
+
 		this.updateStatus(InstanceStatus.Connecting)
 
-		if (this.osc) {
-			this.osc.close()
+		// Open the forwarding socket first, so it is ready before the first
+		// message can arrive on the socket below.
+		if (feedbackEnabled && this.config.forwardOSC) {
+			const forwardPort = this.parsePort(this.config.forwardPort)
+			if (forwardPort === undefined) {
+				this.log('error', 'OSC forwarding is enabled but the Companion listen port is not valid')
+			} else {
+				const companionPort = new osc.UDPPort({
+					localAddress: '0.0.0.0',
+					// This socket only ever sends, so it never needs a predictable port.
+					// osc.js defaults localPort to 57121, which collides as soon as a
+					// second instance (or a reconnect) tries to bind it, so ask for an
+					// ephemeral port instead.
+					localPort: 0,
+					remoteAddress: '127.0.0.1',
+					remotePort: forwardPort,
+				})
+				companionPort.on('ready', () => {
+					this.log('debug', 'OSC forwarding ready on port ' + companionPort.socket.address().port)
+				})
+				// Without a listener an EADDRINUSE here would take down the whole module
+				companionPort.on('error', (err) => {
+					this.log('error', 'OSC forwarding error: ' + err)
+				})
+				this.companionOsc = companionPort
+				companionPort.open()
+			}
 		}
-		if (this.companionOsc) {
-			this.companionOsc.close()
-		}
-		this.osc = new osc.UDPPort({
-			localAddress: '0.0.0.0',
-			localPort: this.config.rxPort,
-			remoteAddress: this.config.host,
-			remotePort: this.config.port,
-		})
-		this.companionOsc = new osc.UDPPort({
-			localAddress: '0.0.0.0',
-			remoteAddress: '127.0.0.1',
-			remotePort: this.config.forwardPort,
-		})
-		this.companionOsc.open()
-		this.osc.on('ready', () => {
-			this.log('debug', 'OSC ready')
-			this.updateStatus(InstanceStatus.Connecting)
 
-			this.sendOSC('/feedback/pb+exec')
+		const oscPort = new osc.UDPPort({
+			localAddress: '0.0.0.0',
+			// Only claim the configured feedback port when the console is actually
+			// transmitting to it. With feedback off nothing needs to reach us on a
+			// known port, so bind 0 and let the OS pick a free one - otherwise every
+			// instance would fight over the same port and fail with EADDRINUSE.
+			localPort: feedbackEnabled ? rxPort : 0,
+			remoteAddress: this.config.host,
+			remotePort: remotePort,
 		})
-		this.osc.on('message', (msg) => {
+
+		oscPort.on('ready', () => {
+			this.log('debug', 'OSC ready on port ' + oscPort.socket.address().port)
+
+			if (feedbackEnabled) {
+				// Stay in Connecting until the console actually sends something back
+				this.sendOSC('/feedback/pb+exec')
+			} else {
+				// Send-only on a connectionless socket, so there is nothing to wait for
+				this.updateStatus(InstanceStatus.Ok)
+			}
+		})
+		oscPort.on('message', (msg) => {
 			this.log('debug', 'OSC message: ' + msg.address + ' ' + msg.args)
 			this.updateStatus(InstanceStatus.Ok)
 
 			this.checkVariables(msg)
 
 			// check if we need to forward the message to Companion
-			if (this.config.forwardOSC && this.config.forwardPort) {
+			if (this.companionOsc) {
 				this.companionOsc.send({
 					address: msg.address,
 					args: msg.args,
@@ -309,31 +382,34 @@ export default class MagicQInstance extends InstanceBase {
 				this.log('debug', 'Forwarding OSC message to Companion: ' + msg.address + ' ' + msg.args)
 			}
 		})
-		this.osc.on('error', (err) => {
+		oscPort.on('error', (err) => {
 			this.log('error', 'OSC error: ' + err)
 			this.updateStatus(InstanceStatus.ConnectionFailure, err.message)
 		})
-		this.osc.open()
+
+		this.osc = oscPort
+		oscPort.open()
 	}
 
 	sendOSC(cmd, args = null) {
-		if (this.config.host && this.config.port && this.config.port > 0 && this.config.port < 65536) {
-			if (args === null) {
-				args = []
-			}
-			this.log('debug', 'sendOSC: ' + cmd + ' ' + JSON.stringify(args))
-			this.osc.send({
-				address: cmd,
-				args: args,
-			})
-		} else {
-			this.log('error', 'Could not send OSC: host or port not defined')
+		if (this.osc === null) {
+			this.log('error', 'Could not send OSC: not connected, check the module config')
+			return
 		}
+
+		if (args === null) {
+			args = []
+		}
+		this.log('debug', 'sendOSC: ' + cmd + ' ' + JSON.stringify(args))
+		this.osc.send({
+			address: cmd,
+			args: args,
+		})
 	}
 
 	async destroy() {
 		this.log('debug', 'destroy')
-		this.osc.close()
+		this.closeOSC()
 	}
 
 	async configUpdated(config) {
@@ -551,9 +627,10 @@ export default class MagicQInstance extends InstanceBase {
 					}
 					this.sendOSC('/pb/' + pbId + '/flash', arg)
 					// set the value in the playbacks array since magicQ does not send feedback for OSC commands
-					this.playbacks[pbId].flash = action.options.pbFId
+					// store the resolved value, not the dropdown id, so toggle and the feedback agree
+					this.playbacks[pbId].flash = flashVal
 					this.setVariableValues({
-						['pb' + pbId + '_flash']: action.options.pbFId,
+						['pb' + pbId + '_flash']: flashVal,
 					})
 					this.checkFeedbacks('pbFlash')
 				},
@@ -668,7 +745,7 @@ export default class MagicQInstance extends InstanceBase {
 				callback: (action) => {
 					var arg = {
 						type: 'i',
-						value: action.options.swapId,
+						value: parseInt(action.options.swapId),
 					}
 					this.sendOSC('/swap', arg)
 				},
@@ -716,6 +793,9 @@ export default class MagicQInstance extends InstanceBase {
 					var exeNr = parseInt(action.options.exeNr)
 					var exeVal = this.clamp(parseInt(action.options.exeVal), 0, 100)
 					var exeToggle = action.options.exeToggle
+					// magicQ does not send feedback for OSC commands, so this module
+					// tracks the state itself - make sure there is somewhere to put it
+					this.ensureExecVariable(exeP, exeNr)
 					// handle toggle
 					if (exeToggle) {
 						if (this.execs[exeP][exeNr] === undefined) {
@@ -729,22 +809,6 @@ export default class MagicQInstance extends InstanceBase {
 						value: exeVal / 100,
 					}
 					this.sendOSC('/exec/' + exeP + '/' + exeNr, arg)
-					// set the value in the execs array since magicQ does not send feedback for OSC commands
-					if (this.execs[exeP] === undefined) {
-						this.execs[exeP] = []
-					}
-					if (this.execs[exeP][exeNr] === undefined) {
-						// need to add the variable to companion
-						this.variables.push({
-							variableId: 'exec' + exeP + '_' + exeNr,
-							name: 'Execute Page ' + exeP + ', Exec ' + exeNr,
-						})
-						const variableDefinitions = {}
-						for (const variable of this.variables) {
-							variableDefinitions[variable.variableId] = { name: variable.name }
-						}
-						this.setVariableDefinitions(variableDefinitions)
-					}
 					this.setVariableValues({
 						['exec' + exeP + '_' + exeNr]: exeVal,
 					})
@@ -785,10 +849,8 @@ export default class MagicQInstance extends InstanceBase {
 					var exeP = this.clamp(parseInt(action.options.exeP), 1, 10)
 					var exeNr = this.clamp(parseInt(action.options.exeNr), 1, 100)
 					var exeVal = this.clamp(parseInt(action.options.exeVal), -100, 100)
-					// chack if we have a current value of the execute
-					if (this.execs[exeP] === undefined) {
-						this.execs[exeP] = []
-					}
+					// check if we have a current value of the execute
+					this.ensureExecVariable(exeP, exeNr)
 					if (this.execs[exeP][exeNr] === undefined) {
 						this.execs[exeP][exeNr] = 0
 					}
