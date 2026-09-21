@@ -21,6 +21,8 @@ export default class MagicQInstance extends InstanceBase {
 		for (var i = 1; i <= 10; i++) {
 			this.execs[i] = []
 		}
+		// desk black out state, tracked so the DBO toggle has something to read
+		this.dbo = 0
 		this.variables = {}
 	}
 
@@ -752,13 +754,16 @@ export default class MagicQInstance extends InstanceBase {
 					var dboVal = this.clamp(parseInt(action.options.dboId), 0, 2)
 					// handle toggle
 					if (dboVal === 2) {
-						dboVal = this.playbacks[1].flash === 1 ? 0 : 1
+						dboVal = this.dbo === 1 ? 0 : 1
 					}
 					var arg = {
 						type: 'i',
 						value: dboVal,
 					}
 					this.sendOSC('/dbo', arg)
+					// magicQ does not send feedback for OSC commands, so track the
+					// resolved state here for the next toggle
+					this.dbo = dboVal
 				},
 			},
 
