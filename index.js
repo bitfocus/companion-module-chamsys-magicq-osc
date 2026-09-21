@@ -27,24 +27,45 @@ export default class MagicQInstance extends InstanceBase {
 	async init(config) {
 		this.config = config
 
-		// Definitions do not depend on the connection, so always register them.
+		// Actions do not depend on the connection, so always register them.
 		// Otherwise a bad config would leave buttons with no actions to call.
 		this.updateActions()
+		// Variables and feedbacks only ever reflect what this module sent, not
+		// what the console is actually doing, unless feedback is enabled - so
+		// they are registered only in that case.
 		this.initVariables()
 		this.initFeedbacks()
 
 		this.setupOSC()
 	}
 
+	feedbackEnabled() {
+		return !!this.config.enableFeedback
+	}
+
 	async initVariables() {
 		this.variables = {}
-		for (var i = 1; i <= 10; i++) {
-			this.variables['pb' + i] = { name: 'Playback ' + i + ' Level' }
 
-			this.variables['pb' + i + '_flash'] = { name: 'Playback ' + i + ' Flash' }
+		if (this.feedbackEnabled()) {
+			for (var i = 1; i <= 10; i++) {
+				this.variables['pb' + i] = { name: 'Playback ' + i + ' Level' }
+
+				this.variables['pb' + i + '_flash'] = { name: 'Playback ' + i + ' Flash' }
+			}
 		}
 
+		// Always publish, so turning feedback off clears any previously
+		// registered variables rather than leaving them behind stale.
 		this.setVariableDefinitions(this.variables)
+	}
+
+	// No-op when feedback is disabled, since the variables are not registered
+	// then. State tracking on this.playbacks / this.execs continues regardless,
+	// because the action toggles depend on it.
+	setTrackedVariables(values) {
+		if (this.feedbackEnabled()) {
+			this.setVariableValues(values)
+		}
 	}
 
 	clamp(value, min, max) {
@@ -60,9 +81,15 @@ export default class MagicQInstance extends InstanceBase {
 
 	// Execute variables are not known up front, so they are registered the
 	// first time a given page/number is seen - from feedback or from an action.
+	// The page array is always created: the Execute toggle reads it whether or
+	// not feedback is enabled.
 	ensureExecVariable(execPage, execNr) {
 		if (this.execs[execPage] === undefined) {
 			this.execs[execPage] = []
+		}
+
+		if (!this.feedbackEnabled()) {
+			return
 		}
 
 		const variableId = 'exec' + execPage + '_' + execNr
@@ -73,6 +100,13 @@ export default class MagicQInstance extends InstanceBase {
 	}
 
 	async initFeedbacks() {
+		if (!this.feedbackEnabled()) {
+			// Publish an empty set, so turning feedback off clears any
+			// previously registered feedbacks rather than leaving them behind.
+			this.setFeedbackDefinitions({})
+			return
+		}
+
 		this.setFeedbackDefinitions({
 			pb: {
 				type: 'boolean',
@@ -251,7 +285,7 @@ export default class MagicQInstance extends InstanceBase {
 			const pbVal = parseFloat(msg.args)
 			const pbValPercent = Math.round(pbVal * 100)
 			this.playbacks[pbId].value = pbValPercent
-			this.setVariableValues({
+			this.setTrackedVariables({
 				['pb' + pbId]: pbValPercent,
 			})
 			this.checkFeedbacks('pb')
@@ -260,7 +294,7 @@ export default class MagicQInstance extends InstanceBase {
 			const pbId = msg.address.match(pbFlashRegex)[1]
 			const pbFlash = parseInt(msg.args)
 			this.playbacks[pbId].flash = pbFlash
-			this.setVariableValues({
+			this.setTrackedVariables({
 				['pb' + pbId + '_flash']: pbFlash,
 			})
 			this.checkFeedbacks('pbFlash')
@@ -272,7 +306,7 @@ export default class MagicQInstance extends InstanceBase {
 			const execValPercent = Math.round(execVal * 100)
 			this.log('debug', 'execPage: ' + execPage + ' execNr: ' + execNr + ' value: ' + execValPercent)
 			this.ensureExecVariable(execPage, execNr)
-			this.setVariableValues({
+			this.setTrackedVariables({
 				['exec' + execPage + '_' + execNr]: execValPercent,
 			})
 			// set the value in the execs array
@@ -519,7 +553,7 @@ export default class MagicQInstance extends InstanceBase {
 					this.sendOSC('/pb/' + pbId, arg)
 					// set the value in the playbacks array since magicQ does not send feedback for OSC commands
 					this.playbacks[pbId].value = pbVal
-					this.setVariableValues({
+					this.setTrackedVariables({
 						['pb' + pbId]: pbVal,
 					})
 					this.checkFeedbacks('pb')
@@ -565,7 +599,7 @@ export default class MagicQInstance extends InstanceBase {
 					this.sendOSC('/pb/' + pbId, arg)
 					// set the value in the playbacks array since magicQ does not send feedback for OSC commands
 					this.playbacks[pbId].value = pbNewLevel
-					this.setVariableValues({
+					this.setTrackedVariables({
 						['pb' + pbId]: pbNewLevel,
 					})
 					this.checkFeedbacks('pb')
@@ -629,7 +663,7 @@ export default class MagicQInstance extends InstanceBase {
 					// set the value in the playbacks array since magicQ does not send feedback for OSC commands
 					// store the resolved value, not the dropdown id, so toggle and the feedback agree
 					this.playbacks[pbId].flash = flashVal
-					this.setVariableValues({
+					this.setTrackedVariables({
 						['pb' + pbId + '_flash']: flashVal,
 					})
 					this.checkFeedbacks('pbFlash')
@@ -809,7 +843,7 @@ export default class MagicQInstance extends InstanceBase {
 						value: exeVal / 100,
 					}
 					this.sendOSC('/exec/' + exeP + '/' + exeNr, arg)
-					this.setVariableValues({
+					this.setTrackedVariables({
 						['exec' + exeP + '_' + exeNr]: exeVal,
 					})
 					this.execs[exeP][exeNr] = exeVal
@@ -868,7 +902,7 @@ export default class MagicQInstance extends InstanceBase {
 						value: exeNewLevel / 100,
 					}
 					this.sendOSC('/exec/' + exeP + '/' + exeNr, arg)
-					this.setVariableValues({
+					this.setTrackedVariables({
 						['exec' + exeP + '_' + exeNr]: exeNewLevel,
 					})
 					this.execs[exeP][exeNr] = exeNewLevel
