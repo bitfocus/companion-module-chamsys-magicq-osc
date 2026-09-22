@@ -1,7 +1,7 @@
 {
   "name": "chamsys-magicq-osc",
   "version": "3.2.0",
-  "main": "index.js",
+  "main": "src/main.js",
   "type": "module",
   "scripts": {
     "format": "prettier -w .",
