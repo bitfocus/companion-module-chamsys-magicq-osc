@@ -11,14 +11,14 @@ export default class MagicQInstance extends InstanceBase {
 
 		// objects for playbacks and executes
 		this.playbacks = []
-		for (var i = 1; i <= 10; i++) {
+		for (let i = 1; i <= 10; i++) {
 			this.playbacks[i] = {
 				value: 0,
 				flash: 0,
 			}
 		}
 		this.execs = []
-		for (var i = 1; i <= 10; i++) {
+		for (let i = 1; i <= 10; i++) {
 			this.execs[i] = []
 		}
 		// desk black out state, tracked so the DBO toggle has something to read
@@ -49,7 +49,7 @@ export default class MagicQInstance extends InstanceBase {
 		this.variables = {}
 
 		if (this.feedbackEnabled()) {
-			for (var i = 1; i <= 10; i++) {
+			for (let i = 1; i <= 10; i++) {
 				this.variables['pb' + i] = { name: 'Playback ' + i + ' Level' }
 
 				this.variables['pb' + i + '_flash'] = { name: 'Playback ' + i + ' Flash' }
@@ -175,13 +175,13 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: (feedback) => {
-					var pbId = this.parseOption(feedback.options.pbId, 1, 10)
-					var pbVal = this.parseOption(feedback.options.pbVal, 0, 100)
-					var pbComp = feedback.options.pbComp
+					const pbId = this.parseOption(feedback.options.pbId, 1, 10)
+					const pbVal = this.parseOption(feedback.options.pbVal, 0, 100)
+					const pbComp = feedback.options.pbComp
 					if (pbId === undefined || (pbComp !== 'isActive' && pbVal === undefined)) {
 						return false
 					}
-					var pbLevel = this.playbacks[pbId].value
+					const pbLevel = this.playbacks[pbId].value
 
 					switch (pbComp) {
 						case 'isActive':
@@ -220,7 +220,7 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: (feedback) => {
-					var pbId = this.parseOption(feedback.options.pbId, 1, 10)
+					const pbId = this.parseOption(feedback.options.pbId, 1, 10)
 					if (pbId === undefined) {
 						return false
 					}
@@ -278,10 +278,10 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: (feedback) => {
-					var execPage = this.parseOption(feedback.options.execPage, 1, 10)
-					var execNumber = this.parseOption(feedback.options.execNumber)
-					var execVal = this.parseOption(feedback.options.execVal, 0, 100)
-					var execComp = feedback.options.execComp
+					const execPage = this.parseOption(feedback.options.execPage, 1, 10)
+					const execNumber = this.parseOption(feedback.options.execNumber)
+					const execVal = this.parseOption(feedback.options.execVal, 0, 100)
+					const execComp = feedback.options.execComp
 					if (
 						execPage === undefined ||
 						execNumber === undefined ||
@@ -289,7 +289,7 @@ export default class MagicQInstance extends InstanceBase {
 					) {
 						return false
 					}
-					var execLevel = this.execs[execPage][execNumber]
+					const execLevel = this.execs[execPage][execNumber]
 
 					switch (execComp) {
 						case 'isActive':
@@ -602,14 +602,14 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.parseOption(action.options.pbId, 1, 10)
-					var pbVal = this.parseOption(action.options.pbVal, 0, 100)
+					const pbId = this.parseOption(action.options.pbId, 1, 10)
+					const pbVal = this.parseOption(action.options.pbVal, 0, 100)
 					if (pbId === undefined || pbVal === undefined) {
 						this.log('warn', 'Set playback fader: playback and level must both be numbers')
 						return
 					}
 
-					var arg = {
+					const arg = {
 						type: 'i',
 						value: pbVal,
 					}
@@ -644,14 +644,14 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.parseOption(action.options.pbId, 1, 10)
-					var pbVal = this.parseOption(action.options.pbVal, -100, 100)
+					const pbId = this.parseOption(action.options.pbId, 1, 10)
+					const pbVal = this.parseOption(action.options.pbVal, -100, 100)
 					if (pbId === undefined || pbVal === undefined) {
 						this.log('warn', 'Adjust playback level: playback and amount must both be numbers')
 						return
 					}
 					// get the current value of the playback
-					var pbNewLevel = this.playbacks[pbId].value + pbVal
+					let pbNewLevel = this.playbacks[pbId].value + pbVal
 					// check if the new level is greater than 100 or less than 0
 					if (pbNewLevel > 100) {
 						pbNewLevel = 100
@@ -659,7 +659,7 @@ export default class MagicQInstance extends InstanceBase {
 						pbNewLevel = 0
 					}
 
-					var arg = {
+					const arg = {
 						type: 'i',
 						value: pbNewLevel,
 					}
@@ -686,7 +686,7 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.parseOption(action.options.pbId, 1, 10)
+					const pbId = this.parseOption(action.options.pbId, 1, 10)
 					if (pbId === undefined) {
 						this.log('warn', 'Go on playback: playback must be a number')
 						return
@@ -719,8 +719,12 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.parseOption(action.options.pbId, 1, 10)
-					var flashVal = this.clamp(parseInt(action.options.pbFId), 0, 2)
+					const pbId = this.parseOption(action.options.pbId, 1, 10)
+					let flashVal = this.parseOption(action.options.pbFId, 0, 2)
+					if (flashVal === undefined) {
+						this.log('warn', 'Flash playback: action must be a number')
+						return
+					}
 					if (pbId === undefined) {
 						this.log('warn', 'Flash playback: playback must be a number')
 						return
@@ -730,7 +734,7 @@ export default class MagicQInstance extends InstanceBase {
 					if (flashVal === 2) {
 						flashVal = this.playbacks[pbId].flash === 1 ? 0 : 1
 					}
-					var arg = {
+					const arg = {
 						type: 'i',
 						value: flashVal,
 					}
@@ -758,7 +762,7 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.parseOption(action.options.pbId, 1, 10)
+					const pbId = this.parseOption(action.options.pbId, 1, 10)
 					if (pbId === undefined) {
 						this.log('warn', 'Pause playback: playback must be a number')
 						return
@@ -780,7 +784,7 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.parseOption(action.options.pbId, 1, 10)
+					const pbId = this.parseOption(action.options.pbId, 1, 10)
 					if (pbId === undefined) {
 						this.log('warn', 'Release playback: playback must be a number')
 						return
@@ -810,8 +814,8 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var pbId = this.parseOption(action.options.pbId, 1, 10)
-					var cue = this.parseFloatOption(action.options.cue)
+					const pbId = this.parseOption(action.options.pbId, 1, 10)
+					const cue = this.parseFloatOption(action.options.cue)
 					if (pbId === undefined || cue === undefined) {
 						this.log('warn', 'Jump to cue: playback and cue number must both be numbers')
 						return
@@ -836,12 +840,16 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var dboVal = this.clamp(parseInt(action.options.dboId), 0, 2)
+					let dboVal = this.parseOption(action.options.dboId, 0, 2)
+					if (dboVal === undefined) {
+						this.log('warn', 'Desk black out: action must be a number')
+						return
+					}
 					// handle toggle
 					if (dboVal === 2) {
 						dboVal = this.dbo === 1 ? 0 : 1
 					}
-					var arg = {
+					const arg = {
 						type: 'i',
 						value: dboVal,
 					}
@@ -867,9 +875,14 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: (action) => {
-					var arg = {
+					const swapVal = this.parseOption(action.options.swapId, 0, 1)
+					if (swapVal === undefined) {
+						this.log('warn', 'Set swap mode: mode must be a number')
+						return
+					}
+					const arg = {
 						type: 'i',
-						value: parseInt(action.options.swapId),
+						value: swapVal,
 					}
 					this.sendOSC('/swap', arg)
 				},
@@ -913,14 +926,14 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var exeP = this.parseOption(action.options.exeP)
-					var exeNr = this.parseOption(action.options.exeNr)
-					var exeVal = this.parseOption(action.options.exeVal, 0, 100)
+					const exeP = this.parseOption(action.options.exeP)
+					const exeNr = this.parseOption(action.options.exeNr)
+					let exeVal = this.parseOption(action.options.exeVal, 0, 100)
 					if (exeP === undefined || exeNr === undefined || exeVal === undefined) {
 						this.log('warn', 'Execute: page, number and level must all be numbers')
 						return
 					}
-					var exeToggle = action.options.exeToggle
+					const exeToggle = action.options.exeToggle
 					// magicQ does not send feedback for OSC commands, so this module
 					// tracks the state itself - make sure there is somewhere to put it
 					this.ensureExecVariable(exeP, exeNr)
@@ -932,7 +945,7 @@ export default class MagicQInstance extends InstanceBase {
 							exeVal = this.execs[exeP][exeNr] > 0 ? 0 : 100
 						}
 					}
-					var arg = {
+					const arg = {
 						type: 'f',
 						value: exeVal / 100,
 					}
@@ -974,9 +987,9 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var exeP = this.parseOption(action.options.exeP, 1, 10)
-					var exeNr = this.parseOption(action.options.exeNr, 1, 100)
-					var exeVal = this.parseOption(action.options.exeVal, -100, 100)
+					const exeP = this.parseOption(action.options.exeP, 1, 10)
+					const exeNr = this.parseOption(action.options.exeNr, 1, 100)
+					const exeVal = this.parseOption(action.options.exeVal, -100, 100)
 					if (exeP === undefined || exeNr === undefined || exeVal === undefined) {
 						this.log('warn', 'Adjust execute level: page, number and amount must all be numbers')
 						return
@@ -987,7 +1000,7 @@ export default class MagicQInstance extends InstanceBase {
 						this.execs[exeP][exeNr] = 0
 					}
 					// get the current value of the playback
-					var exeNewLevel = this.execs[exeP][exeNr] + parseInt(exeVal)
+					let exeNewLevel = this.execs[exeP][exeNr] + parseInt(exeVal)
 					// check if the new level is greater than 100 or less than 0
 					if (exeNewLevel > 100) {
 						exeNewLevel = 100
@@ -995,7 +1008,7 @@ export default class MagicQInstance extends InstanceBase {
 						exeNewLevel = 0
 					}
 
-					var arg = {
+					const arg = {
 						type: 'f',
 						value: exeNewLevel / 100,
 					}
@@ -1037,15 +1050,15 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var tenSceneItem = this.parseOption(action.options.tenSceneItem)
-					var tenSceneZone = this.parseOption(action.options.tenSceneZone)
-					var tenSceneVal = this.parseFloatOption(action.options.tenSceneVal, 0, 1)
+					const tenSceneItem = this.parseOption(action.options.tenSceneItem)
+					const tenSceneZone = this.parseOption(action.options.tenSceneZone)
+					const tenSceneVal = this.parseFloatOption(action.options.tenSceneVal, 0, 1)
 					if (tenSceneItem === undefined || tenSceneZone === undefined || tenSceneVal === undefined) {
 						this.log('warn', '10Scene: item, zone and level must all be numbers')
 						return
 					}
 
-					var arg = {
+					const arg = {
 						type: 'f',
 						value: tenSceneVal,
 					}
@@ -1065,9 +1078,9 @@ export default class MagicQInstance extends InstanceBase {
 					},
 				],
 				callback: async (action) => {
-					var rpcCmd = action.options.rpcCmd
+					const rpcCmd = action.options.rpcCmd
 
-					var arg = {
+					const arg = {
 						type: 's',
 						value: rpcCmd,
 					}
