@@ -421,7 +421,7 @@ export default function UpdateActions(self) {
 					self.execs[exeP][exeNr] = 0
 				}
 				// get the current value of the playback
-				let exeNewLevel = self.execs[exeP][exeNr] + parseInt(exeVal)
+				let exeNewLevel = self.execs[exeP][exeNr] + exeVal
 				// check if the new level is greater than 100 or less than 0
 				if (exeNewLevel > 100) {
 					exeNewLevel = 100
