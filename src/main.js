@@ -1,4 +1,4 @@
-import { InstanceBase, InstanceStatus } from '@companion-module/base'
+import { InstanceBase, InstanceStatus, Regex } from '@companion-module/base'
 import osc from 'osc'
 
 import UpdateActions from './actions.js'
