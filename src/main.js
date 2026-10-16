@@ -1,10 +1,15 @@
-import { InstanceBase, InstanceStatus } from '@companion-module/base'
+import { InstanceBase, InstanceStatus, Regex } from '@companion-module/base'
 import osc from 'osc'
 
 import UpdateActions from './actions.js'
 import UpdateFeedbacks from './feedbacks.js'
 import UpdateVariableDefinitions from './variables.js'
 import UpgradeScripts from './upgrades.js'
+
+// how long to wait for anything from the console before warning
+const FEEDBACK_TIMEOUT_MS = 10000
+// how long to wait before trying to open the sockets again after a failure
+const RECONNECT_DELAY_MS = 5000
 
 export default class MagicQInstance extends InstanceBase {
 	constructor(internal) {
@@ -29,21 +34,40 @@ export default class MagicQInstance extends InstanceBase {
 		// desk black out state, tracked so the DBO toggle has something to read
 		this.dbo = 0
 		this.variables = {}
+		// last status sent to Companion, so repeats are not re-sent per message
+		this.lastStatus = null
+		// fires when the console has not sent anything back for a while
+		this.feedbackTimer = null
 	}
 
 	async init(config) {
 		this.config = config
 
-		// Actions do not depend on the connection, so always register them.
-		// Otherwise a bad config would leave buttons with no actions to call.
+		// Actions, feedbacks and variables do not depend on the connection, so
+		// always register them. Otherwise a bad config, or feedback being turned
+		// off, would leave buttons pointing at definitions that no longer exist.
+		// With feedback off they reflect what this module sent, as in v3.1.1.
 		this.updateActions()
-		// Variables and feedbacks only ever reflect what this module sent, not
-		// what the console is actually doing, unless feedback is enabled - so
-		// they are registered only in that case.
 		this.updateVariableDefinitions()
 		this.updateFeedbacks()
 
-		this.setupOSC()
+		try {
+			this.setupOSC()
+		} catch (err) {
+			this.log('error', 'Error setting up OSC: ' + err)
+			this.setStatus(InstanceStatus.UnknownError, String(err?.message ?? err))
+		}
+	}
+
+	// Only pass a status on when it changes. The console streams messages while
+	// a fader moves, and each one would otherwise be another update to Companion.
+	setStatus(status, message = null) {
+		const key = status + '|' + (message ?? '')
+		if (key === this.lastStatus) {
+			return
+		}
+		this.lastStatus = key
+		this.updateStatus(status, message)
 	}
 
 	feedbackEnabled() {
@@ -62,13 +86,26 @@ export default class MagicQInstance extends InstanceBase {
 		UpdateVariableDefinitions(this)
 	}
 
-	// No-op when feedback is disabled, since the variables are not registered
-	// then. State tracking on this.playbacks / this.execs continues regardless,
-	// because the action toggles depend on it.
 	setTrackedVariables(values) {
-		if (this.feedbackEnabled()) {
-			this.setVariableValues(values)
+		this.setVariableValues(values)
+	}
+
+	// Current values of every playback and execute this module knows about, so
+	// variables can be re-published after their definitions are rebuilt.
+	trackedVariableValues() {
+		const values = {}
+		for (let i = 1; i <= 10; i++) {
+			values['pb' + i] = this.playbacks[i].value
+			values['pb' + i + '_flash'] = this.playbacks[i].flash
 		}
+		this.execs.forEach((page, execPage) => {
+			page?.forEach((value, execNr) => {
+				if (value !== undefined) {
+					values['exec' + execPage + '_' + execNr] = value
+				}
+			})
+		})
+		return values
 	}
 
 	clamp(value, min, max) {
@@ -97,6 +134,23 @@ export default class MagicQInstance extends InstanceBase {
 		return min === undefined ? parsed : this.clamp(parsed, min, max)
 	}
 
+	// Execute pages and numbers have no fixed upper bound on MagicQ, so the same
+	// rule applies everywhere: both must be whole numbers of 1 or more. Returns
+	// undefined otherwise, rather than clamping to a different execute.
+	parseExecTarget(pageValue, nrValue) {
+		const execPage = parseInt(pageValue, 10)
+		const execNr = parseInt(nrValue, 10)
+		if (!Number.isInteger(execPage) || !Number.isInteger(execNr) || execPage < 1 || execNr < 1) {
+			return undefined
+		}
+		return { execPage, execNr }
+	}
+
+	// Current level of an execute, or undefined when it has not been seen yet
+	execLevel(execPage, execNr) {
+		return this.execs[execPage]?.[execNr]
+	}
+
 	// Config values arrive as strings, so coerce and validate before handing
 	// them to dgram. Returns undefined when the value is not a usable port.
 	parsePort(value) {
@@ -106,15 +160,9 @@ export default class MagicQInstance extends InstanceBase {
 
 	// Execute variables are not known up front, so they are registered the
 	// first time a given page/number is seen - from feedback or from an action.
-	// The page array is always created: the Execute toggle reads it whether or
-	// not feedback is enabled.
 	ensureExecVariable(execPage, execNr) {
 		if (this.execs[execPage] === undefined) {
 			this.execs[execPage] = []
-		}
-
-		if (!this.feedbackEnabled()) {
-			return
 		}
 
 		const variableId = 'exec' + execPage + '_' + execNr
@@ -136,7 +184,16 @@ export default class MagicQInstance extends InstanceBase {
 		return false
 	}
 
-	async checkVariables(msg) {
+	// OSC arguments arrive as a list; MagicQ sends a single number. Returns
+	// undefined when the first argument is missing or not a number.
+	oscNumber(msg) {
+		const arg = Array.isArray(msg.args) ? msg.args[0] : msg.args
+		const value = typeof arg === 'object' && arg !== null ? arg.value : arg
+		const parsed = typeof value === 'number' ? value : parseFloat(value)
+		return Number.isFinite(parsed) ? parsed : undefined
+	}
+
+	checkVariables(msg) {
 		const pbRegex = /\/pb\/(\d+)$/ // regex for /pb/<pbId (int)>
 		const pbFlashRegex = /\/pb\/(\d+)\/flash$/ // regex for /pb/<pbId (int)>/flash
 		const execRegex = /\/exec\/(\d+)\/(\d+)$/ // regex for /exec/<exeP (int)>/<exeNr (int)>
@@ -146,32 +203,43 @@ export default class MagicQInstance extends InstanceBase {
 			if (!this.isKnownPlayback(pbId)) {
 				return
 			}
-			const pbVal = parseFloat(msg.args)
+			const pbVal = this.oscNumber(msg)
+			if (pbVal === undefined) {
+				this.log('debug', 'Ignoring ' + msg.address + ': value is not a number')
+				return
+			}
 			const pbValPercent = Math.round(pbVal * 100)
 			this.playbacks[pbId].value = pbValPercent
 			this.setTrackedVariables({
 				['pb' + pbId]: pbValPercent,
 			})
 			this.checkFeedbacks('pb')
-			this.log('debug', 'pbId: ' + pbId + ' value: ' + pbValPercent)
 		} else if (pbFlashRegex.test(msg.address)) {
 			const pbId = msg.address.match(pbFlashRegex)[1]
 			if (!this.isKnownPlayback(pbId)) {
 				return
 			}
-			const pbFlash = parseInt(msg.args)
+			const pbFlashVal = this.oscNumber(msg)
+			if (pbFlashVal === undefined) {
+				this.log('debug', 'Ignoring ' + msg.address + ': value is not a number')
+				return
+			}
+			const pbFlash = Math.trunc(pbFlashVal)
 			this.playbacks[pbId].flash = pbFlash
 			this.setTrackedVariables({
 				['pb' + pbId + '_flash']: pbFlash,
 			})
 			this.checkFeedbacks('pbFlash')
-			this.log('debug', 'pbId: ' + pbId + ' flash: ' + pbFlash)
 		} else if (execRegex.test(msg.address)) {
-			const execPage = msg.address.match(execRegex)[1]
-			const execNr = msg.address.match(execRegex)[2]
-			const execVal = parseFloat(msg.args)
+			const match = msg.address.match(execRegex)
+			const target = this.parseExecTarget(match[1], match[2])
+			const execVal = this.oscNumber(msg)
+			if (target === undefined || execVal === undefined) {
+				this.log('debug', 'Ignoring ' + msg.address + ': page, number or value is not valid')
+				return
+			}
+			const { execPage, execNr } = target
 			const execValPercent = Math.round(execVal * 100)
-			this.log('debug', 'execPage: ' + execPage + ' execNr: ' + execNr + ' value: ' + execValPercent)
 			this.ensureExecVariable(execPage, execNr)
 			this.setTrackedVariables({
 				['exec' + execPage + '_' + execNr]: execValPercent,
@@ -179,12 +247,35 @@ export default class MagicQInstance extends InstanceBase {
 			// set the value in the execs array
 			this.execs[execPage][execNr] = execValPercent
 			this.checkFeedbacks('exec')
-		} else {
-			return
+		}
+	}
+
+	// With feedback on, warn when the console has not replied to the feedback
+	// request - usually its OSC TX IP or port does not point at Companion.
+	// MagicQ only sends on change, so once it has replied, silence is normal.
+	restartFeedbackTimer() {
+		this.stopFeedbackTimer()
+		this.feedbackTimer = setTimeout(() => {
+			this.feedbackTimer = null
+			this.setStatus(
+				InstanceStatus.UnknownWarning,
+				'No OSC received from console - check the OSC TX IP and port on MagicQ',
+			)
+			// MagicQ may have restarted, so ask for feedback again
+			this.sendOSC('/feedback/pb+exec')
+			this.restartFeedbackTimer()
+		}, FEEDBACK_TIMEOUT_MS)
+	}
+
+	stopFeedbackTimer() {
+		if (this.feedbackTimer) {
+			clearTimeout(this.feedbackTimer)
+			this.feedbackTimer = null
 		}
 	}
 
 	closeOSC() {
+		this.stopFeedbackTimer()
 		for (const port of [this.osc, this.companionOsc]) {
 			if (!port) {
 				continue
@@ -199,27 +290,31 @@ export default class MagicQInstance extends InstanceBase {
 		this.companionOsc = null
 	}
 
-	async setupOSC() {
+	setupOSC() {
 		this.closeOSC()
 
 		const remotePort = this.parsePort(this.config.port)
 		if (!this.config.host || remotePort === undefined) {
-			this.updateStatus(InstanceStatus.BadConfig, 'Target IP and port must be set')
+			this.setStatus(InstanceStatus.BadConfig, 'Target IP and port must be set')
 			return
 		}
 
-		const feedbackEnabled = !!this.config.enableFeedback
+		const feedbackEnabled = this.feedbackEnabled()
+		const forwardOSC = !!this.config.forwardOSC
+		// Forwarding relays what the console sends, so it needs the listening
+		// socket too, whether or not feedback is enabled.
+		const listen = feedbackEnabled || forwardOSC
 		const rxPort = this.parsePort(this.config.rxPort)
-		if (feedbackEnabled && rxPort === undefined) {
-			this.updateStatus(InstanceStatus.BadConfig, 'Feedback port must be set when feedback is enabled')
+		if (listen && rxPort === undefined) {
+			this.setStatus(InstanceStatus.BadConfig, 'Feedback port must be set when feedback or forwarding is enabled')
 			return
 		}
 
-		this.updateStatus(InstanceStatus.Connecting)
+		this.setStatus(InstanceStatus.Connecting)
 
 		// Open the forwarding socket first, so it is ready before the first
 		// message can arrive on the socket below.
-		if (feedbackEnabled && this.config.forwardOSC) {
+		if (forwardOSC) {
 			const forwardPort = this.parsePort(this.config.forwardPort)
 			if (forwardPort === undefined) {
 				this.log('error', 'OSC forwarding is enabled but the Companion listen port is not valid')
@@ -249,47 +344,68 @@ export default class MagicQInstance extends InstanceBase {
 		const oscPort = new osc.UDPPort({
 			localAddress: '0.0.0.0',
 			// Only claim the configured feedback port when the console is actually
-			// transmitting to it. With feedback off nothing needs to reach us on a
-			// known port, so bind 0 and let the OS pick a free one - otherwise every
+			// transmitting to it. Otherwise nothing needs to reach us on a known
+			// port, so bind 0 and let the OS pick a free one - otherwise every
 			// instance would fight over the same port and fail with EADDRINUSE.
-			localPort: feedbackEnabled ? rxPort : 0,
+			localPort: listen ? rxPort : 0,
 			remoteAddress: this.config.host,
 			remotePort: remotePort,
 		})
 
+		let ready = false
 		oscPort.on('ready', () => {
+			ready = true
 			this.log('debug', 'OSC ready on port ' + oscPort.socket.address().port)
 
 			if (feedbackEnabled) {
 				// Stay in Connecting until the console actually sends something back
 				this.sendOSC('/feedback/pb+exec')
+				this.restartFeedbackTimer()
 			} else {
 				// Send-only on a connectionless socket, so there is nothing to wait for
-				this.updateStatus(InstanceStatus.Ok)
+				this.setStatus(InstanceStatus.Ok)
 			}
 		})
-		oscPort.on('message', (msg) => {
-			this.log('debug', 'OSC message: ' + msg.address + ' ' + msg.args)
-			this.updateStatus(InstanceStatus.Ok)
+		oscPort.on('message', (msg, timeTag, info) => {
+			// Only the console proves the connection works - anything else can
+			// reach this port too
+			if (feedbackEnabled && info?.address === this.config.host) {
+				this.setStatus(InstanceStatus.Ok)
+				this.stopFeedbackTimer()
+			}
 
-			// checkVariables is async, so an unhandled rejection here would be
-			// fatal - a malformed message must never take the module down
-			this.checkVariables(msg).catch((err) => {
-				this.log('error', 'Error handling OSC message ' + msg.address + ': ' + err)
-			})
+			if (feedbackEnabled) {
+				// a malformed message must never take the module down
+				try {
+					this.checkVariables(msg)
+				} catch (err) {
+					this.log('error', 'Error handling OSC message ' + msg.address + ': ' + err)
+				}
+			}
 
 			// check if we need to forward the message to Companion
 			if (this.companionOsc) {
-				this.companionOsc.send({
-					address: msg.address,
-					args: msg.args,
-				})
-				this.log('debug', 'Forwarding OSC message to Companion: ' + msg.address + ' ' + msg.args)
+				try {
+					this.companionOsc.send({
+						address: msg.address,
+						args: msg.args,
+					})
+				} catch (err) {
+					this.log('debug', 'Error forwarding OSC message ' + msg.address + ': ' + err)
+				}
 			}
 		})
 		oscPort.on('error', (err) => {
-			this.log('error', 'OSC error: ' + err)
-			this.updateStatus(InstanceStatus.ConnectionFailure, err.message)
+			// Only a socket that cannot be opened means the connection is down.
+			// Undecodable packets and one-off send failures (a short network
+			// blip) are logged, but must not leave the status red.
+			if (!ready || err.syscall === 'bind') {
+				this.log('error', 'OSC error: ' + err)
+				this.setStatus(InstanceStatus.ConnectionFailure, err.message)
+				this.scheduleReconnect()
+			} else {
+				this.log('warn', 'OSC error: ' + err)
+			}
 		})
 
 		this.osc = oscPort
@@ -306,20 +422,49 @@ export default class MagicQInstance extends InstanceBase {
 			args = []
 		}
 		this.log('debug', 'sendOSC: ' + cmd + ' ' + JSON.stringify(args))
-		this.osc.send({
-			address: cmd,
-			args: args,
-		})
+		try {
+			this.osc.send({
+				address: cmd,
+				args: args,
+			})
+		} catch (err) {
+			this.log('warn', 'Could not send OSC ' + cmd + ': ' + err)
+		}
+	}
+
+	// Try to open the sockets again later, e.g. when the feedback port was
+	// held by another program
+	scheduleReconnect() {
+		if (this.reconnectTimer) {
+			return
+		}
+		this.reconnectTimer = setTimeout(() => {
+			this.reconnectTimer = null
+			this.log('info', 'Retrying OSC connection')
+			try {
+				this.setupOSC()
+			} catch (err) {
+				this.log('error', 'Error setting up OSC: ' + err)
+			}
+		}, RECONNECT_DELAY_MS)
+	}
+
+	stopReconnect() {
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer)
+			this.reconnectTimer = null
+		}
 	}
 
 	async destroy() {
 		this.log('debug', 'destroy')
+		this.stopReconnect()
 		this.closeOSC()
 	}
 
 	async configUpdated(config) {
-		this.config = config
-		this.init(config)
+		this.stopReconnect()
+		await this.init(config)
 	}
 
 	getConfigFields() {
@@ -354,18 +499,19 @@ export default class MagicQInstance extends InstanceBase {
 				type: 'checkbox',
 				id: 'enableFeedback',
 				label: 'Enable Feedback',
-				tooltip: 'Requires feedback to be enabled on the Chamsys console OSC settings',
+				tooltip:
+					'Listen for the levels the console sends back. Requires feedback to be enabled on the Chamsys console OSC settings. When off, feedbacks and variables only reflect what this connection has sent.',
 				default: true,
 			},
 			{
 				type: 'textinput',
 				id: 'rxPort',
 				label: 'Feedback Port',
-				tooltip: 'The OSC TX port of the Chamsys console',
+				tooltip: 'The OSC TX port of the Chamsys console. Used for feedback and for forwarding OSC to Companion.',
 				default: '9000',
 				width: 4,
 				regex: Regex.PORT,
-				isVisibleExpression: '$(options:enableFeedback) == true',
+				isVisibleExpression: '$(options:enableFeedback) == true || $(options:forwardOSC) == true',
 			},
 			{
 				type: 'checkbox',
@@ -375,7 +521,6 @@ export default class MagicQInstance extends InstanceBase {
 					'If checked, all OSC messages received from the Chamsys console will be forwarded to Companion at the port below, allowing MagicQ to control Companion with OSC Commands.',
 				default: false,
 				width: 6,
-				isVisibleExpression: '$(options:enableFeedback) == true',
 			},
 			{
 				type: 'textinput',
@@ -386,7 +531,7 @@ export default class MagicQInstance extends InstanceBase {
 				default: '12321',
 				width: 4,
 				regex: Regex.PORT,
-				isVisibleExpression: '$(options:forwardOSC) == true && $(options:enableFeedback) == true',
+				isVisibleExpression: '$(options:forwardOSC) == true',
 			},
 		]
 	}

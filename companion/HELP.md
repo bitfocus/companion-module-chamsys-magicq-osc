@@ -4,6 +4,17 @@ Go to [Chamsys](https://secure.chamsys.co.uk/magicq) to get more information abo
 
 We currently support the following actions, feedbacks and variables:
 
+## Configuration
+
+| Setting                           | What it does                                                                                                                                                                |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Target IP / Target Port           | The IP of the console and its OSC RX port                                                                                                                                   |
+| Enable Feedback                   | Listen for the playback and execute levels the console sends back. When off, feedbacks and variables still work, but only reflect what this connection has sent the console |
+| Feedback Port                     | The OSC TX port of the console. Needed when feedback or OSC forwarding is enabled                                                                                           |
+| Forward OSC messages to Companion | Forward every OSC message received from the console to Companion's own OSC listen port, so MagicQ can control Companion                                                     |
+
+On MagicQ, set the OSC TX IP to the IP of the machine running Companion for feedback and forwarding to work. If the connection shows a warning that no OSC was received, check the OSC TX IP and port on the console.
+
 ## Actions
 
 | Action                       | What it does                                                                                               |

@@ -1,13 +1,6 @@
 import { Regex, combineRgb } from '@companion-module/base'
 
 export default function UpdateFeedbacks(self) {
-	if (!self.feedbackEnabled()) {
-		// Publish an empty set, so turning feedback off clears any
-		// previously registered feedbacks rather than leaving them behind.
-		self.setFeedbackDefinitions({})
-		return
-	}
-
 	self.setFeedbackDefinitions({
 		pb: {
 			type: 'boolean',
@@ -31,6 +24,7 @@ export default function UpdateFeedbacks(self) {
 					label: 'Comparison method',
 					id: 'pbComp',
 					default: 'equal',
+					disableAutoExpression: true,
 					choices: [
 						{ id: 'isActive', label: 'Playback Active' },
 						{ id: 'equal', label: 'Equal' },
@@ -134,6 +128,7 @@ export default function UpdateFeedbacks(self) {
 					label: 'Comparison method',
 					id: 'execComp',
 					default: 'equal',
+					disableAutoExpression: true,
 					choices: [
 						{ id: 'isActive', label: 'Execute Active' },
 						{ id: 'equal', label: 'Equal' },
@@ -155,14 +150,13 @@ export default function UpdateFeedbacks(self) {
 				},
 			],
 			callback: (feedback) => {
-				const execPage = self.parseOption(feedback.options.execPage, 1, 10)
-				const execNumber = self.parseOption(feedback.options.execNumber)
+				const target = self.parseExecTarget(feedback.options.execPage, feedback.options.execNumber)
 				const execVal = self.parseOption(feedback.options.execVal, 0, 100)
 				const execComp = feedback.options.execComp
-				if (execPage === undefined || execNumber === undefined || (execComp !== 'isActive' && execVal === undefined)) {
+				if (target === undefined || (execComp !== 'isActive' && execVal === undefined)) {
 					return false
 				}
-				const execLevel = self.execs[execPage][execNumber]
+				const execLevel = self.execLevel(target.execPage, target.execNr)
 
 				switch (execComp) {
 					case 'isActive':

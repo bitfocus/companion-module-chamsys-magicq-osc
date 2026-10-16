@@ -136,6 +136,7 @@ export default function UpdateActions(self) {
 						{ id: '0', label: 'Flash Off' },
 						{ id: '2', label: 'Flash Toggle' },
 					],
+					disableAutoExpression: true,
 					default: '1',
 				},
 			],
@@ -257,6 +258,7 @@ export default function UpdateActions(self) {
 						{ id: '0', label: 'Black Out Off' },
 						{ id: '2', label: 'Black Out Toggle' },
 					],
+					disableAutoExpression: true,
 					default: '1',
 				},
 			],
@@ -292,6 +294,7 @@ export default function UpdateActions(self) {
 						{ id: '0', label: 'Add' },
 						{ id: '1', label: 'Swap' },
 					],
+					disableAutoExpression: true,
 					default: '0',
 				},
 			],
@@ -333,6 +336,7 @@ export default function UpdateActions(self) {
 					label: 'Toggle?',
 					id: 'exeToggle',
 					default: false,
+					disableAutoExpression: true,
 					tooltip: 'If checked, this action will just toggle the execute button',
 				},
 				{
@@ -347,25 +351,27 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const exeP = self.parseOption(action.options.exeP)
-				const exeNr = self.parseOption(action.options.exeNr)
-				let exeVal = self.parseOption(action.options.exeVal, 0, 100)
-				if (exeP === undefined || exeNr === undefined || exeVal === undefined) {
-					self.log('warn', 'Execute: page, number and level must all be numbers')
+				const target = self.parseExecTarget(action.options.exeP, action.options.exeNr)
+				if (target === undefined) {
+					self.log('warn', 'Execute: page and number must both be whole numbers of 1 or more')
 					return
 				}
-				const exeToggle = action.options.exeToggle
+				const { execPage: exeP, execNr: exeNr } = target
+				const exeToggle = !!action.options.exeToggle
+				let exeVal
+				if (exeToggle) {
+					// the level field is hidden in toggle mode, so it is not checked
+					exeVal = self.execLevel(exeP, exeNr) > 0 ? 0 : 100
+				} else {
+					exeVal = self.parseOption(action.options.exeVal, 0, 100)
+					if (exeVal === undefined) {
+						self.log('warn', 'Execute: level must be a number')
+						return
+					}
+				}
 				// magicQ does not send feedback for OSC commands, so this module
 				// tracks the state itself - make sure there is somewhere to put it
 				self.ensureExecVariable(exeP, exeNr)
-				// handle toggle
-				if (exeToggle) {
-					if (self.execs[exeP][exeNr] === undefined) {
-						exeVal = 100
-					} else {
-						exeVal = self.execs[exeP][exeNr] > 0 ? 0 : 100
-					}
-				}
 				const arg = {
 					type: 'f',
 					value: exeVal / 100,
@@ -384,7 +390,7 @@ export default function UpdateActions(self) {
 			options: [
 				{
 					type: 'textinput',
-					label: 'Execute Page (1-10)',
+					label: 'Execute Page',
 					id: 'exeP',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -408,13 +414,16 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const exeP = self.parseOption(action.options.exeP, 1, 10)
-				const exeNr = self.parseOption(action.options.exeNr, 1, 100)
+				const target = self.parseExecTarget(action.options.exeP, action.options.exeNr)
 				const exeVal = self.parseOption(action.options.exeVal, -100, 100)
-				if (exeP === undefined || exeNr === undefined || exeVal === undefined) {
-					self.log('warn', 'Adjust execute level: page, number and amount must all be numbers')
+				if (target === undefined || exeVal === undefined) {
+					self.log(
+						'warn',
+						'Adjust execute level: page and number must be whole numbers of 1 or more, and amount a number',
+					)
 					return
 				}
+				const { execPage: exeP, execNr: exeNr } = target
 				// check if we have a current value of the execute
 				self.ensureExecVariable(exeP, exeNr)
 				if (self.execs[exeP][exeNr] === undefined) {
@@ -499,7 +508,11 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const rpcCmd = action.options.rpcCmd
+				const rpcCmd = String(action.options.rpcCmd ?? '').trim()
+				if (rpcCmd === '') {
+					self.log('warn', 'RPC Command: command is empty, nothing sent')
+					return
+				}
 
 				const arg = {
 					type: 's',
