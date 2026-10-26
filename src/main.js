@@ -5,17 +5,12 @@ import UpdateActions from './actions.js'
 import UpdateFeedbacks from './feedbacks.js'
 import UpdateVariableDefinitions from './variables.js'
 import UpgradeScripts from './upgrades.js'
+import { MAX_EXEC_PAGE, MAX_EXEC_NR } from './constants.js'
 
 // how long to wait for anything from the console before warning
 const FEEDBACK_TIMEOUT_MS = 10000
 // how long to wait before trying to open the sockets again after a failure
 const RECONNECT_DELAY_MS = 5000
-// MagicQ sets no hard limit on execute pages and numbers, but they are used as
-// array indices, so an unbounded value (a typo, or an expression resolving to
-// 1e9) would allocate an array that long and freeze the module for tens of
-// seconds the next time the variables are rebuilt. Far above any real desk.
-const MAX_EXEC_PAGE = 1000
-const MAX_EXEC_NR = 1000
 
 export default class MagicQInstance extends InstanceBase {
 	constructor(internal) {
@@ -58,6 +53,7 @@ export default class MagicQInstance extends InstanceBase {
 
 	async init(config) {
 		this.config = config
+		this.destroyed = false
 
 		// Actions, feedbacks and variables do not depend on the connection, so
 		// always register them. Otherwise a bad config, or feedback being turned
@@ -281,7 +277,10 @@ export default class MagicQInstance extends InstanceBase {
 			const target = this.parseExecTarget(match[1], match[2])
 			const execVal = this.oscNumber(msg)
 			if (target === undefined || execVal === undefined) {
-				this.log('debug', 'Ignoring ' + msg.address + ': page, number or value is not valid')
+				this.log(
+					'warn',
+					'Ignoring ' + msg.address + ': execute page must be 1-' + MAX_EXEC_PAGE + ' and number 1-' + MAX_EXEC_NR,
+				)
 				return
 			}
 			const { execPage, execNr } = target
@@ -336,6 +335,11 @@ export default class MagicQInstance extends InstanceBase {
 				// socket being replaced could otherwise fail the connection that
 				// replaced it, or schedule a retry after destroy().
 				port.removeAllListeners()
+				// osc.js forwards the dgram socket's errors onto the port, and that
+				// forwarder is attached to the socket, so the detach above cannot
+				// remove it. An 'error' with no listener throws, and these arrive
+				// from async socket callbacks where nothing would catch it.
+				port.on('error', () => {})
 				port.close()
 			} catch (err) {
 				this.log('debug', 'Error closing OSC port: ' + err)

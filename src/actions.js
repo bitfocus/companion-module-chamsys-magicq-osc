@@ -1,5 +1,7 @@
 import { Regex } from '@companion-module/base'
 
+import { MAX_EXEC_PAGE, MAX_EXEC_NR } from './constants.js'
+
 export default function UpdateActions(self) {
 	self.setActionDefinitions({
 		pb: {
@@ -353,7 +355,7 @@ export default function UpdateActions(self) {
 			callback: async (action) => {
 				const target = self.parseExecTarget(action.options.exeP, action.options.exeNr)
 				if (target === undefined) {
-					self.log('warn', 'Execute: page and number must both be whole numbers of 1 or more')
+					self.log('warn', `Execute: page must be 1-${MAX_EXEC_PAGE} and number 1-${MAX_EXEC_NR}`)
 					return
 				}
 				const { execPage: exeP, execNr: exeNr } = target
@@ -419,7 +421,7 @@ export default function UpdateActions(self) {
 				if (target === undefined || exeVal === undefined) {
 					self.log(
 						'warn',
-						'Adjust execute level: page and number must be whole numbers of 1 or more, and amount a number',
+						`Adjust execute level: page must be 1-${MAX_EXEC_PAGE}, number 1-${MAX_EXEC_NR} and amount a number`,
 					)
 					return
 				}

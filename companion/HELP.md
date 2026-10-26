@@ -33,7 +33,7 @@ On MagicQ, set the OSC TX IP to the IP of the machine running Companion for feed
 | Playback jump to cue         | Jumps to the given cue on the given playback                                                               |
 | Desk Black Out               | Turn on, turn off, or toggle DBO                                                                           |
 | Set Swap Mode                | Sets the swap mode to add or swap                                                                          |
-| Execute                      | Control or toggle Execute buttons / faders                                                                 |
+| Execute                      | Control or toggle Execute buttons / faders (page and number 1-1000)                                        |
 | Adjust Execute level         | Adjusts the execute fader level by the given value 0 - 100 %                                               |
 | 10 Scene                     | Control 10Scene buttons / faders                                                                           |
 | RPC Command                  | Send a RPC command to the console                                                                          |
