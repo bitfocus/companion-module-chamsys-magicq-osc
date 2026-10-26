@@ -38,6 +38,11 @@ export default class MagicQInstance extends InstanceBase {
 		this.lastStatus = null
 		// fires when the console has not sent anything back for a while
 		this.feedbackTimer = null
+		// retries opening the sockets after a failure
+		this.reconnectTimer = null
+		// whether the console has ever replied, so the "no OSC received" warning
+		// is only raised before the first reply
+		this.consoleSeen = false
 	}
 
 	async init(config) {
@@ -138,12 +143,27 @@ export default class MagicQInstance extends InstanceBase {
 	// rule applies everywhere: both must be whole numbers of 1 or more. Returns
 	// undefined otherwise, rather than clamping to a different execute.
 	parseExecTarget(pageValue, nrValue) {
-		const execPage = parseInt(pageValue, 10)
-		const execNr = parseInt(nrValue, 10)
+		// Number() rather than parseInt(): parseInt('2.7') is 2 and parseInt('3abc')
+		// is 3, so a fractional or trailing-garbage value would silently become a
+		// different execute instead of being rejected.
+		const execPage = Number(pageValue)
+		const execNr = Number(nrValue)
 		if (!Number.isInteger(execPage) || !Number.isInteger(execNr) || execPage < 1 || execNr < 1) {
 			return undefined
 		}
 		return { execPage, execNr }
+	}
+
+	// MagicQ addresses playbacks 1-10. Out of that range there is nothing to
+	// talk to, so reject rather than clamp: silently driving playback 10 when
+	// the button asked for 15 is worse than doing nothing and saying so. Same
+	// rule as parseExecTarget.
+	parsePlayback(value) {
+		const pbId = Number(value)
+		if (!Number.isInteger(pbId) || pbId < 1 || pbId > 10) {
+			return undefined
+		}
+		return pbId
 	}
 
 	// Current level of an execute, or undefined when it has not been seen yet
@@ -250,18 +270,21 @@ export default class MagicQInstance extends InstanceBase {
 		}
 	}
 
-	// With feedback on, warn when the console has not replied to the feedback
-	// request - usually its OSC TX IP or port does not point at Companion.
-	// MagicQ only sends on change, so once it has replied, silence is normal.
+	// With feedback on, ask the console again whenever it has gone quiet, so a
+	// console that restarted - and forgot the subscription - starts sending
+	// again on its own. Only warn while nothing has ever been received: MagicQ
+	// sends on change, so silence from a console that has replied is normal and
+	// must not turn the connection yellow mid-show.
 	restartFeedbackTimer() {
 		this.stopFeedbackTimer()
 		this.feedbackTimer = setTimeout(() => {
 			this.feedbackTimer = null
-			this.setStatus(
-				InstanceStatus.UnknownWarning,
-				'No OSC received from console - check the OSC TX IP and port on MagicQ',
-			)
-			// MagicQ may have restarted, so ask for feedback again
+			if (!this.consoleSeen) {
+				this.setStatus(
+					InstanceStatus.UnknownWarning,
+					'No OSC received from console - check the OSC TX IP and port on MagicQ',
+				)
+			}
 			this.sendOSC('/feedback/pb+exec')
 			this.restartFeedbackTimer()
 		}, FEEDBACK_TIMEOUT_MS)
@@ -292,6 +315,8 @@ export default class MagicQInstance extends InstanceBase {
 
 	setupOSC() {
 		this.closeOSC()
+		// new sockets, new config: nothing has been heard on them yet
+		this.consoleSeen = false
 
 		const remotePort = this.parsePort(this.config.port)
 		if (!this.config.host || remotePort === undefined) {
@@ -316,29 +341,47 @@ export default class MagicQInstance extends InstanceBase {
 		// message can arrive on the socket below.
 		if (forwardOSC) {
 			const forwardPort = this.parsePort(this.config.forwardPort)
-			if (forwardPort === undefined) {
-				this.log('error', 'OSC forwarding is enabled but the Companion listen port is not valid')
-			} else {
-				const companionPort = new osc.UDPPort({
-					localAddress: '0.0.0.0',
-					// This socket only ever sends, so it never needs a predictable port.
-					// osc.js defaults localPort to 57121, which collides as soon as a
-					// second instance (or a reconnect) tries to bind it, so ask for an
-					// ephemeral port instead.
-					localPort: 0,
-					remoteAddress: '127.0.0.1',
-					remotePort: forwardPort,
-				})
-				companionPort.on('ready', () => {
-					this.log('debug', 'OSC forwarding ready on port ' + companionPort.socket.address().port)
-				})
-				// Without a listener an EADDRINUSE here would take down the whole module
-				companionPort.on('error', (err) => {
-					this.log('error', 'OSC forwarding error: ' + err)
-				})
-				this.companionOsc = companionPort
-				companionPort.open()
+			if (listen && forwardPort === rxPort) {
+				// Forwarding to the port we listen on feeds every packet straight
+				// back in, and each pass forwards it again.
+				this.setStatus(
+					InstanceStatus.BadConfig,
+					'Companion OSC listen port must differ from the feedback port, or forwarded messages loop back',
+				)
+				return
 			}
+			if (forwardPort === undefined) {
+				// Same treatment as a missing feedback port: a connection that
+				// cannot do what its config asks must not sit there looking fine.
+				this.setStatus(InstanceStatus.BadConfig, 'Companion OSC listen port must be set when forwarding is enabled')
+				return
+			}
+
+			const companionPort = new osc.UDPPort({
+				localAddress: '0.0.0.0',
+				// This socket only ever sends, so it never needs a predictable port.
+				// osc.js defaults localPort to 57121, which collides as soon as a
+				// second instance (or a reconnect) tries to bind it, so ask for an
+				// ephemeral port instead.
+				localPort: 0,
+				remoteAddress: '127.0.0.1',
+				remotePort: forwardPort,
+			})
+			companionPort.on('ready', () => {
+				this.log('debug', 'OSC forwarding ready on port ' + companionPort.socket.address().port)
+			})
+			// Without a listener an EADDRINUSE here would take down the whole module
+			companionPort.on('error', (err) => {
+				this.log('error', 'OSC forwarding error: ' + err)
+				// Drop the socket rather than keep sending into a broken one,
+				// which would only surface as debug lines per message.
+				if (this.companionOsc === companionPort) {
+					this.companionOsc = null
+				}
+				this.setStatus(InstanceStatus.UnknownWarning, 'OSC forwarding to Companion is not running: ' + err.message)
+			})
+			this.companionOsc = companionPort
+			companionPort.open()
 		}
 
 		const oscPort = new osc.UDPPort({
@@ -366,15 +409,20 @@ export default class MagicQInstance extends InstanceBase {
 				this.setStatus(InstanceStatus.Ok)
 			}
 		})
-		oscPort.on('message', (msg, timeTag, info) => {
-			// Only the console proves the connection works - anything else can
-			// reach this port too
-			if (feedbackEnabled && info?.address === this.config.host) {
-				this.setStatus(InstanceStatus.Ok)
-				this.stopFeedbackTimer()
-			}
-
+		oscPort.on('message', (msg) => {
+			// Anything arriving on this socket counts as proof the console can
+			// reach us: it is the port the user set aside for it. Matching the
+			// sender against the Target IP looks stricter, but the console
+			// legitimately replies from another address - MagicQ PC on this
+			// machine sends from 127.0.0.1 while Target IP is the LAN address -
+			// and the status would then contradict variables that are updating.
 			if (feedbackEnabled) {
+				this.consoleSeen = true
+				this.setStatus(InstanceStatus.Ok)
+				// Keep the watchdog running: a console that restarts forgets the
+				// feedback subscription, and only a re-request brings it back.
+				this.restartFeedbackTimer()
+
 				// a malformed message must never take the module down
 				try {
 					this.checkVariables(msg)
@@ -445,6 +493,7 @@ export default class MagicQInstance extends InstanceBase {
 				this.setupOSC()
 			} catch (err) {
 				this.log('error', 'Error setting up OSC: ' + err)
+				this.setStatus(InstanceStatus.UnknownError, String(err?.message ?? err))
 			}
 		}, RECONNECT_DELAY_MS)
 	}
@@ -458,8 +507,11 @@ export default class MagicQInstance extends InstanceBase {
 
 	async destroy() {
 		this.log('debug', 'destroy')
-		this.stopReconnect()
+		// Close first: the port's error handler can still fire while it is being
+		// closed, and it calls scheduleReconnect(). Cancelling afterwards means
+		// no timer can outlive destroy().
 		this.closeOSC()
+		this.stopReconnect()
 	}
 
 	async configUpdated(config) {
@@ -503,6 +555,9 @@ export default class MagicQInstance extends InstanceBase {
 					'Listen for the levels the console sends back. Requires feedback to be enabled on the Chamsys console OSC settings. When off, feedbacks and variables only reflect what this connection has sent.',
 				default: true,
 				width: 6,
+				// Referenced by the Feedback Port field's isVisibleExpression below,
+				// which may only read fields that cannot become expressions.
+				disableAutoExpression: true,
 			},
 			{
 				type: 'textinput',
@@ -522,6 +577,9 @@ export default class MagicQInstance extends InstanceBase {
 					'If checked, all OSC messages received from the Chamsys console will be forwarded to Companion at the port below, allowing MagicQ to control Companion with OSC Commands.',
 				default: false,
 				width: 6,
+				// Referenced by the Feedback Port and Companion OSC Listen Port
+				// isVisibleExpressions, which may only read non-expression fields.
+				disableAutoExpression: true,
 			},
 			{
 				type: 'textinput',

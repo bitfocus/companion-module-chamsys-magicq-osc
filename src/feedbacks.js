@@ -46,7 +46,7 @@ export default function UpdateFeedbacks(self) {
 				},
 			],
 			callback: (feedback) => {
-				const pbId = self.parseOption(feedback.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(feedback.options.pbId)
 				const pbVal = self.parseOption(feedback.options.pbVal, 0, 100)
 				const pbComp = feedback.options.pbComp
 				if (pbId === undefined || (pbComp !== 'isActive' && pbVal === undefined)) {
@@ -91,7 +91,7 @@ export default function UpdateFeedbacks(self) {
 				},
 			],
 			callback: (feedback) => {
-				const pbId = self.parseOption(feedback.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(feedback.options.pbId)
 				if (pbId === undefined) {
 					return false
 				}
@@ -156,7 +156,11 @@ export default function UpdateFeedbacks(self) {
 				if (target === undefined || (execComp !== 'isActive' && execVal === undefined)) {
 					return false
 				}
-				const execLevel = self.execLevel(target.execPage, target.execNr)
+				// An execute nobody has touched yet has no stored level. Treat it as
+				// 0, the way playbacks are seeded in the constructor: otherwise
+				// "Not Equal 0" is true for every unused execute (undefined !== 0),
+				// and "Less than" stays false for one that really is at 0.
+				const execLevel = self.execLevel(target.execPage, target.execNr) ?? 0
 
 				switch (execComp) {
 					case 'isActive':
