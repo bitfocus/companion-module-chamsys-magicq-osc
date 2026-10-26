@@ -10,6 +10,12 @@ import UpgradeScripts from './upgrades.js'
 const FEEDBACK_TIMEOUT_MS = 10000
 // how long to wait before trying to open the sockets again after a failure
 const RECONNECT_DELAY_MS = 5000
+// MagicQ sets no hard limit on execute pages and numbers, but they are used as
+// array indices, so an unbounded value (a typo, or an expression resolving to
+// 1e9) would allocate an array that long and freeze the module for tens of
+// seconds the next time the variables are rebuilt. Far above any real desk.
+const MAX_EXEC_PAGE = 1000
+const MAX_EXEC_NR = 1000
 
 export default class MagicQInstance extends InstanceBase {
 	constructor(internal) {
@@ -40,6 +46,11 @@ export default class MagicQInstance extends InstanceBase {
 		this.feedbackTimer = null
 		// retries opening the sockets after a failure
 		this.reconnectTimer = null
+		// set once destroy() has run, so nothing schedules work afterwards
+		this.destroyed = false
+		// set when the forwarding socket could not be opened, so the connection
+		// keeps saying so instead of reporting a plain Ok
+		this.forwardingFailed = false
 		// whether the console has ever replied, so the "no OSC received" warning
 		// is only raised before the first reply
 		this.consoleSeen = false
@@ -77,6 +88,18 @@ export default class MagicQInstance extends InstanceBase {
 
 	feedbackEnabled() {
 		return !!this.config.enableFeedback
+	}
+
+	// The status to show while the connection itself is fine. Forwarding is a
+	// separate promise to the user, so a connection that cannot forward must not
+	// report a plain Ok - otherwise the next message from the console would paint
+	// over the warning and hide that MagicQ can no longer reach Companion.
+	reportReachable() {
+		if (this.forwardingFailed) {
+			this.setStatus(InstanceStatus.UnknownWarning, 'OSC forwarding to Companion is not running')
+			return
+		}
+		this.setStatus(InstanceStatus.Ok)
 	}
 
 	updateActions() {
@@ -139,16 +162,19 @@ export default class MagicQInstance extends InstanceBase {
 		return min === undefined ? parsed : this.clamp(parsed, min, max)
 	}
 
-	// Execute pages and numbers have no fixed upper bound on MagicQ, so the same
-	// rule applies everywhere: both must be whole numbers of 1 or more. Returns
-	// undefined otherwise, rather than clamping to a different execute.
+	// The same rule everywhere: both must be whole numbers from 1 up to the
+	// ceiling above. Returns undefined otherwise, rather than clamping to a
+	// different execute.
 	parseExecTarget(pageValue, nrValue) {
 		// Number() rather than parseInt(): parseInt('2.7') is 2 and parseInt('3abc')
 		// is 3, so a fractional or trailing-garbage value would silently become a
 		// different execute instead of being rejected.
 		const execPage = Number(pageValue)
 		const execNr = Number(nrValue)
-		if (!Number.isInteger(execPage) || !Number.isInteger(execNr) || execPage < 1 || execNr < 1) {
+		if (!Number.isInteger(execPage) || execPage < 1 || execPage > MAX_EXEC_PAGE) {
+			return undefined
+		}
+		if (!Number.isInteger(execNr) || execNr < 1 || execNr > MAX_EXEC_NR) {
 			return undefined
 		}
 		return { execPage, execNr }
@@ -299,11 +325,17 @@ export default class MagicQInstance extends InstanceBase {
 
 	closeOSC() {
 		this.stopFeedbackTimer()
+		this.stopReconnect()
 		for (const port of [this.osc, this.companionOsc]) {
 			if (!port) {
 				continue
 			}
 			try {
+				// Detach before closing. A port can still report an error while it
+				// is going away, and its handlers close over this instance - so a
+				// socket being replaced could otherwise fail the connection that
+				// replaced it, or schedule a retry after destroy().
+				port.removeAllListeners()
 				port.close()
 			} catch (err) {
 				this.log('debug', 'Error closing OSC port: ' + err)
@@ -317,6 +349,7 @@ export default class MagicQInstance extends InstanceBase {
 		this.closeOSC()
 		// new sockets, new config: nothing has been heard on them yet
 		this.consoleSeen = false
+		this.forwardingFailed = false
 
 		const remotePort = this.parsePort(this.config.port)
 		if (!this.config.host || remotePort === undefined) {
@@ -341,7 +374,7 @@ export default class MagicQInstance extends InstanceBase {
 		// message can arrive on the socket below.
 		if (forwardOSC) {
 			const forwardPort = this.parsePort(this.config.forwardPort)
-			if (listen && forwardPort === rxPort) {
+			if (forwardPort === rxPort) {
 				// Forwarding to the port we listen on feeds every packet straight
 				// back in, and each pass forwards it again.
 				this.setStatus(
@@ -357,6 +390,7 @@ export default class MagicQInstance extends InstanceBase {
 				return
 			}
 
+			let forwardReady = false
 			const companionPort = new osc.UDPPort({
 				localAddress: '0.0.0.0',
 				// This socket only ever sends, so it never needs a predictable port.
@@ -368,17 +402,34 @@ export default class MagicQInstance extends InstanceBase {
 				remotePort: forwardPort,
 			})
 			companionPort.on('ready', () => {
+				forwardReady = true
 				this.log('debug', 'OSC forwarding ready on port ' + companionPort.socket.address().port)
 			})
 			// Without a listener an EADDRINUSE here would take down the whole module
 			companionPort.on('error', (err) => {
+				// osc.js reports a failed bind and a failed send through the same
+				// event. A socket that never opened is unusable, so give it up and
+				// say so; one that did open is seeing a blip - the far end may not
+				// be listening yet - and must keep working, or forwarding would be
+				// dead until the connection is rebuilt.
+				if (forwardReady) {
+					this.log('warn', 'OSC forwarding error: ' + err)
+					return
+				}
+
 				this.log('error', 'OSC forwarding error: ' + err)
-				// Drop the socket rather than keep sending into a broken one,
-				// which would only surface as debug lines per message.
+				this.forwardingFailed = true
 				if (this.companionOsc === companionPort) {
 					this.companionOsc = null
 				}
-				this.setStatus(InstanceStatus.UnknownWarning, 'OSC forwarding to Companion is not running: ' + err.message)
+				// Close it here: once the reference is dropped, closeOSC() can no
+				// longer reach the socket and it would stay bound for good.
+				try {
+					companionPort.close()
+				} catch (closeErr) {
+					this.log('debug', 'Error closing OSC forwarding port: ' + closeErr)
+				}
+				this.reportReachable()
 			})
 			this.companionOsc = companionPort
 			companionPort.open()
@@ -406,7 +457,7 @@ export default class MagicQInstance extends InstanceBase {
 				this.restartFeedbackTimer()
 			} else {
 				// Send-only on a connectionless socket, so there is nothing to wait for
-				this.setStatus(InstanceStatus.Ok)
+				this.reportReachable()
 			}
 		})
 		oscPort.on('message', (msg) => {
@@ -418,7 +469,7 @@ export default class MagicQInstance extends InstanceBase {
 			// and the status would then contradict variables that are updating.
 			if (feedbackEnabled) {
 				this.consoleSeen = true
-				this.setStatus(InstanceStatus.Ok)
+				this.reportReachable()
 				// Keep the watchdog running: a console that restarts forgets the
 				// feedback subscription, and only a re-request brings it back.
 				this.restartFeedbackTimer()
@@ -483,7 +534,7 @@ export default class MagicQInstance extends InstanceBase {
 	// Try to open the sockets again later, e.g. when the feedback port was
 	// held by another program
 	scheduleReconnect() {
-		if (this.reconnectTimer) {
+		if (this.destroyed || this.reconnectTimer) {
 			return
 		}
 		this.reconnectTimer = setTimeout(() => {
@@ -507,15 +558,13 @@ export default class MagicQInstance extends InstanceBase {
 
 	async destroy() {
 		this.log('debug', 'destroy')
-		// Close first: the port's error handler can still fire while it is being
-		// closed, and it calls scheduleReconnect(). Cancelling afterwards means
-		// no timer can outlive destroy().
+		// Mark it gone before tearing down, so nothing that runs during the close
+		// can schedule more work.
+		this.destroyed = true
 		this.closeOSC()
-		this.stopReconnect()
 	}
 
 	async configUpdated(config) {
-		this.stopReconnect()
 		await this.init(config)
 	}
 
