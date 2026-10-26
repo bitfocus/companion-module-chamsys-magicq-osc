@@ -1,13 +1,6 @@
 import { Regex, combineRgb } from '@companion-module/base'
 
 export default function UpdateFeedbacks(self) {
-	if (!self.feedbackEnabled()) {
-		// Publish an empty set, so turning feedback off clears any
-		// previously registered feedbacks rather than leaving them behind.
-		self.setFeedbackDefinitions({})
-		return
-	}
-
 	self.setFeedbackDefinitions({
 		pb: {
 			type: 'boolean',
@@ -31,6 +24,7 @@ export default function UpdateFeedbacks(self) {
 					label: 'Comparison method',
 					id: 'pbComp',
 					default: 'equal',
+					disableAutoExpression: true,
 					choices: [
 						{ id: 'isActive', label: 'Playback Active' },
 						{ id: 'equal', label: 'Equal' },
@@ -52,7 +46,7 @@ export default function UpdateFeedbacks(self) {
 				},
 			],
 			callback: (feedback) => {
-				const pbId = self.parseOption(feedback.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(feedback.options.pbId)
 				const pbVal = self.parseOption(feedback.options.pbVal, 0, 100)
 				const pbComp = feedback.options.pbComp
 				if (pbId === undefined || (pbComp !== 'isActive' && pbVal === undefined)) {
@@ -97,7 +91,7 @@ export default function UpdateFeedbacks(self) {
 				},
 			],
 			callback: (feedback) => {
-				const pbId = self.parseOption(feedback.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(feedback.options.pbId)
 				if (pbId === undefined) {
 					return false
 				}
@@ -134,6 +128,7 @@ export default function UpdateFeedbacks(self) {
 					label: 'Comparison method',
 					id: 'execComp',
 					default: 'equal',
+					disableAutoExpression: true,
 					choices: [
 						{ id: 'isActive', label: 'Execute Active' },
 						{ id: 'equal', label: 'Equal' },
@@ -155,14 +150,17 @@ export default function UpdateFeedbacks(self) {
 				},
 			],
 			callback: (feedback) => {
-				const execPage = self.parseOption(feedback.options.execPage, 1, 10)
-				const execNumber = self.parseOption(feedback.options.execNumber)
+				const target = self.parseExecTarget(feedback.options.execPage, feedback.options.execNumber)
 				const execVal = self.parseOption(feedback.options.execVal, 0, 100)
 				const execComp = feedback.options.execComp
-				if (execPage === undefined || execNumber === undefined || (execComp !== 'isActive' && execVal === undefined)) {
+				if (target === undefined || (execComp !== 'isActive' && execVal === undefined)) {
 					return false
 				}
-				const execLevel = self.execs[execPage][execNumber]
+				// An execute nobody has touched yet has no stored level. Treat it as
+				// 0, the way playbacks are seeded in the constructor: otherwise
+				// "Not Equal 0" is true for every unused execute (undefined !== 0),
+				// and "Less than" stays false for one that really is at 0.
+				const execLevel = self.execLevel(target.execPage, target.execNr) ?? 0
 
 				switch (execComp) {
 					case 'isActive':

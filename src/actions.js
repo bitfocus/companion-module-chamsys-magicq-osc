@@ -1,5 +1,7 @@
 import { Regex } from '@companion-module/base'
 
+import { MAX_EXEC_PAGE, MAX_EXEC_NR } from './constants.js'
+
 export default function UpdateActions(self) {
 	self.setActionDefinitions({
 		pb: {
@@ -23,10 +25,10 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				const pbVal = self.parseOption(action.options.pbVal, 0, 100)
 				if (pbId === undefined || pbVal === undefined) {
-					self.log('warn', 'Set playback fader: playback and level must both be numbers')
+					self.log('warn', 'Set playback fader: playback must be 1-10 and level a number')
 					return
 				}
 
@@ -65,10 +67,10 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				const pbVal = self.parseOption(action.options.pbVal, -100, 100)
 				if (pbId === undefined || pbVal === undefined) {
-					self.log('warn', 'Adjust playback level: playback and amount must both be numbers')
+					self.log('warn', 'Adjust playback level: playback must be 1-10 and amount a number')
 					return
 				}
 				// get the current value of the playback
@@ -107,9 +109,9 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				if (pbId === undefined) {
-					self.log('warn', 'Go on playback: playback must be a number')
+					self.log('warn', 'Go on playback: playback must be a whole number from 1 to 10')
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/go')
@@ -136,18 +138,19 @@ export default function UpdateActions(self) {
 						{ id: '0', label: 'Flash Off' },
 						{ id: '2', label: 'Flash Toggle' },
 					],
+					disableAutoExpression: true,
 					default: '1',
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				let flashVal = self.parseOption(action.options.pbFId, 0, 2)
 				if (flashVal === undefined) {
 					self.log('warn', 'Flash playback: action must be a number')
 					return
 				}
 				if (pbId === undefined) {
-					self.log('warn', 'Flash playback: playback must be a number')
+					self.log('warn', 'Flash playback: playback must be a whole number from 1 to 10')
 					return
 				}
 
@@ -183,9 +186,9 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				if (pbId === undefined) {
-					self.log('warn', 'Pause playback: playback must be a number')
+					self.log('warn', 'Pause playback: playback must be a whole number from 1 to 10')
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/pause')
@@ -205,9 +208,9 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				if (pbId === undefined) {
-					self.log('warn', 'Release playback: playback must be a number')
+					self.log('warn', 'Release playback: playback must be a whole number from 1 to 10')
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/release')
@@ -235,10 +238,10 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				const cue = self.parseFloatOption(action.options.cue)
 				if (pbId === undefined || cue === undefined) {
-					self.log('warn', 'Jump to cue: playback and cue number must both be numbers')
+					self.log('warn', 'Jump to cue: playback must be 1-10 and cue number a number')
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/' + cue)
@@ -257,6 +260,7 @@ export default function UpdateActions(self) {
 						{ id: '0', label: 'Black Out Off' },
 						{ id: '2', label: 'Black Out Toggle' },
 					],
+					disableAutoExpression: true,
 					default: '1',
 				},
 			],
@@ -292,6 +296,7 @@ export default function UpdateActions(self) {
 						{ id: '0', label: 'Add' },
 						{ id: '1', label: 'Swap' },
 					],
+					disableAutoExpression: true,
 					default: '0',
 				},
 			],
@@ -333,6 +338,7 @@ export default function UpdateActions(self) {
 					label: 'Toggle?',
 					id: 'exeToggle',
 					default: false,
+					disableAutoExpression: true,
 					tooltip: 'If checked, this action will just toggle the execute button',
 				},
 				{
@@ -347,25 +353,27 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const exeP = self.parseOption(action.options.exeP)
-				const exeNr = self.parseOption(action.options.exeNr)
-				let exeVal = self.parseOption(action.options.exeVal, 0, 100)
-				if (exeP === undefined || exeNr === undefined || exeVal === undefined) {
-					self.log('warn', 'Execute: page, number and level must all be numbers')
+				const target = self.parseExecTarget(action.options.exeP, action.options.exeNr)
+				if (target === undefined) {
+					self.log('warn', `Execute: page must be 1-${MAX_EXEC_PAGE} and number 1-${MAX_EXEC_NR}`)
 					return
 				}
-				const exeToggle = action.options.exeToggle
+				const { execPage: exeP, execNr: exeNr } = target
+				const exeToggle = !!action.options.exeToggle
+				let exeVal
+				if (exeToggle) {
+					// the level field is hidden in toggle mode, so it is not checked
+					exeVal = self.execLevel(exeP, exeNr) > 0 ? 0 : 100
+				} else {
+					exeVal = self.parseOption(action.options.exeVal, 0, 100)
+					if (exeVal === undefined) {
+						self.log('warn', 'Execute: level must be a number')
+						return
+					}
+				}
 				// magicQ does not send feedback for OSC commands, so this module
 				// tracks the state itself - make sure there is somewhere to put it
 				self.ensureExecVariable(exeP, exeNr)
-				// handle toggle
-				if (exeToggle) {
-					if (self.execs[exeP][exeNr] === undefined) {
-						exeVal = 100
-					} else {
-						exeVal = self.execs[exeP][exeNr] > 0 ? 0 : 100
-					}
-				}
 				const arg = {
 					type: 'f',
 					value: exeVal / 100,
@@ -384,7 +392,7 @@ export default function UpdateActions(self) {
 			options: [
 				{
 					type: 'textinput',
-					label: 'Execute Page (1-10)',
+					label: 'Execute Page',
 					id: 'exeP',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -408,13 +416,16 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const exeP = self.parseOption(action.options.exeP, 1, 10)
-				const exeNr = self.parseOption(action.options.exeNr, 1, 100)
+				const target = self.parseExecTarget(action.options.exeP, action.options.exeNr)
 				const exeVal = self.parseOption(action.options.exeVal, -100, 100)
-				if (exeP === undefined || exeNr === undefined || exeVal === undefined) {
-					self.log('warn', 'Adjust execute level: page, number and amount must all be numbers')
+				if (target === undefined || exeVal === undefined) {
+					self.log(
+						'warn',
+						`Adjust execute level: page must be 1-${MAX_EXEC_PAGE}, number 1-${MAX_EXEC_NR} and amount a number`,
+					)
 					return
 				}
+				const { execPage: exeP, execNr: exeNr } = target
 				// check if we have a current value of the execute
 				self.ensureExecVariable(exeP, exeNr)
 				if (self.execs[exeP][exeNr] === undefined) {
@@ -499,7 +510,11 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const rpcCmd = action.options.rpcCmd
+				const rpcCmd = String(action.options.rpcCmd ?? '').trim()
+				if (rpcCmd === '') {
+					self.log('warn', 'RPC Command: command is empty, nothing sent')
+					return
+				}
 
 				const arg = {
 					type: 's',
