@@ -1,5 +1,7 @@
 import { combineRgb } from '@companion-module/base'
 
+import { MAX_EXEC_PAGE } from './constants.js'
+
 // Button text can show this connection's own variables. Companion rewrites the
 // prefix to the connection's label when the preset is dropped, so the module's
 // shortname stands in for it here.
@@ -139,7 +141,10 @@ export default function UpdatePresets(self) {
 			name: `Playback ${pbId} level`,
 			keywords: ['level', 'fader', 'readout'],
 			style: style(`PB ${pbId}\\n$(${VARIABLE_PREFIX}:pb${pbId})%`),
-			steps: [{ down: [{ actionId: 'pb', options: { pbId: String(pbId), pbVal: '100' } }], up: [] }],
+			// A readout, with no action: the name, the keywords and the face all
+			// say meter, so a press must not move the fader. "Fader to full"
+			// covers that job for every playback.
+			steps: [{ down: [], up: [] }],
 			feedbacks: [
 				{
 					feedbackId: 'pb',
@@ -156,7 +161,7 @@ export default function UpdatePresets(self) {
 		type: 'simple',
 		name: 'Toggle execute',
 		keywords: ['execute', 'toggle', 'exec'],
-		style: style('EX $(local:page)/$(local:exec)'),
+		style: style('EX $(local:page)/$(local:exec)', 'auto'),
 		localVariables: EXECUTE_LOCALS,
 		steps: [
 			{
@@ -164,8 +169,9 @@ export default function UpdatePresets(self) {
 					{
 						actionId: 'execute',
 						// In toggle mode the level is ignored, but every option in the
-						// action's definition still has to be given.
-						options: { exeP: EXECUTE_PAGE, exeNr: EXECUTE, exeToggle: true, exeVal: '1' },
+						// action's definition still has to be given - and 100 is the
+						// sane value if someone unticks Toggle on the button.
+						options: { exeP: EXECUTE_PAGE, exeNr: EXECUTE, exeToggle: true, exeVal: '100' },
 					},
 				],
 				up: [],
@@ -184,7 +190,7 @@ export default function UpdatePresets(self) {
 		type: 'simple',
 		name: 'Execute to full',
 		keywords: ['execute', 'exec', '100'],
-		style: style('EX $(local:page)/$(local:exec)\\nFULL'),
+		style: style('EX $(local:page)/$(local:exec)\\nFULL', 'auto'),
 		localVariables: EXECUTE_LOCALS,
 		steps: [
 			{
@@ -210,7 +216,7 @@ export default function UpdatePresets(self) {
 		type: 'simple',
 		name: 'Release execute',
 		keywords: ['execute', 'exec', 'release', '0'],
-		style: style('EX $(local:page)/$(local:exec)\\nREL'),
+		style: style('EX $(local:page)/$(local:exec)\\nREL', 'auto'),
 		localVariables: EXECUTE_LOCALS,
 		steps: [
 			{
@@ -288,13 +294,14 @@ export default function UpdatePresets(self) {
 		{
 			id: 'playbacks',
 			name: 'Playbacks',
-			description: 'Playback faders 1-10. Each button lights while its playback is above zero.',
+			description:
+				'Playback faders 1-10. Each button lights while its playback is above zero, as reported by the console.',
 			definitions: [
 				{
 					id: 'playback_levels',
 					type: 'simple',
 					name: 'Levels',
-					description: 'Shows the current level and sets the fader to full when pressed.',
+					description: 'Shows the current level of each playback. These buttons do not send anything.',
 					presets: levelPresetIds,
 				},
 				{
@@ -350,7 +357,7 @@ export default function UpdatePresets(self) {
 		{
 			id: 'executes',
 			name: 'Executes',
-			description: `Executes 1-${EXECUTE_COUNT} on page 1. Change the page local variable on the button for another page.`,
+			description: `Executes 1-${EXECUTE_COUNT} on page 1. For another page, change the button's page local variable - a whole number from 1 to ${MAX_EXEC_PAGE}.`,
 			definitions: [
 				{
 					id: 'execute_toggle_group',
