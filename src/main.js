@@ -502,6 +502,7 @@ export default class MagicQInstance extends InstanceBase {
 				tooltip:
 					'Listen for the levels the console sends back. Requires feedback to be enabled on the Chamsys console OSC settings. When off, feedbacks and variables only reflect what this connection has sent.',
 				default: true,
+				width: 6,
 			},
 			{
 				type: 'textinput',
