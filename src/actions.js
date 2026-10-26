@@ -23,10 +23,10 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				const pbVal = self.parseOption(action.options.pbVal, 0, 100)
 				if (pbId === undefined || pbVal === undefined) {
-					self.log('warn', 'Set playback fader: playback and level must both be numbers')
+					self.log('warn', 'Set playback fader: playback must be 1-10 and level a number')
 					return
 				}
 
@@ -65,10 +65,10 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				const pbVal = self.parseOption(action.options.pbVal, -100, 100)
 				if (pbId === undefined || pbVal === undefined) {
-					self.log('warn', 'Adjust playback level: playback and amount must both be numbers')
+					self.log('warn', 'Adjust playback level: playback must be 1-10 and amount a number')
 					return
 				}
 				// get the current value of the playback
@@ -107,9 +107,9 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				if (pbId === undefined) {
-					self.log('warn', 'Go on playback: playback must be a number')
+					self.log('warn', 'Go on playback: playback must be a whole number from 1 to 10')
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/go')
@@ -141,14 +141,14 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				let flashVal = self.parseOption(action.options.pbFId, 0, 2)
 				if (flashVal === undefined) {
 					self.log('warn', 'Flash playback: action must be a number')
 					return
 				}
 				if (pbId === undefined) {
-					self.log('warn', 'Flash playback: playback must be a number')
+					self.log('warn', 'Flash playback: playback must be a whole number from 1 to 10')
 					return
 				}
 
@@ -184,9 +184,9 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				if (pbId === undefined) {
-					self.log('warn', 'Pause playback: playback must be a number')
+					self.log('warn', 'Pause playback: playback must be a whole number from 1 to 10')
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/pause')
@@ -206,9 +206,9 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				if (pbId === undefined) {
-					self.log('warn', 'Release playback: playback must be a number')
+					self.log('warn', 'Release playback: playback must be a whole number from 1 to 10')
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/release')
@@ -236,10 +236,10 @@ export default function UpdateActions(self) {
 				},
 			],
 			callback: async (action) => {
-				const pbId = self.parseOption(action.options.pbId, 1, 10)
+				const pbId = self.parsePlayback(action.options.pbId)
 				const cue = self.parseFloatOption(action.options.cue)
 				if (pbId === undefined || cue === undefined) {
-					self.log('warn', 'Jump to cue: playback and cue number must both be numbers')
+					self.log('warn', 'Jump to cue: playback must be 1-10 and cue number a number')
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/' + cue)
