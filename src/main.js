@@ -4,6 +4,7 @@ import osc from 'osc'
 import UpdateActions from './actions.js'
 import UpdateFeedbacks from './feedbacks.js'
 import UpdateVariableDefinitions from './variables.js'
+import UpdatePresets from './presets.js'
 import UpgradeScripts from './upgrades.js'
 import { MAX_EXEC_PAGE, MAX_EXEC_NR } from './constants.js'
 
@@ -62,6 +63,8 @@ export default class MagicQInstance extends InstanceBase {
 		this.updateActions()
 		this.updateVariableDefinitions()
 		this.updateFeedbacks()
+		// After the actions and feedbacks, since the presets reference them.
+		this.updatePresets()
 
 		try {
 			this.setupOSC()
@@ -108,6 +111,10 @@ export default class MagicQInstance extends InstanceBase {
 
 	updateVariableDefinitions() {
 		UpdateVariableDefinitions(this)
+	}
+
+	updatePresets() {
+		UpdatePresets(this)
 	}
 
 	setTrackedVariables(values) {
