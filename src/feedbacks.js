@@ -189,7 +189,9 @@ export default function UpdateFeedbacks(self) {
 				bgcolor: combineRgb(204, 102, 0),
 			},
 			description:
-				'True while this connection has desk black out on. MagicQ does not report DBO back over OSC, so this follows what Companion last sent, not the desk.',
+				"True while this connection believes desk black out is on. The DBO action presses the console's DBO " +
+				'button rather than setting a state, and MagicQ never reports black out back over OSC, so this follows ' +
+				'what Companion sent. On a latched or tap-to-time DBO button it can disagree with the desk.',
 			// MagicQ does not report DBO back over OSC, so this reflects what this
 			// connection last sent - the same basis the DBO toggle already uses.
 			options: [],

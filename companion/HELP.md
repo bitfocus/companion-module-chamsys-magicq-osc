@@ -31,7 +31,7 @@ On MagicQ, set the OSC TX IP to the IP of the machine running Companion for feed
 | Pause Playback               | Pauses the running cue / cuelist on the given playback                                                     |
 | Release Playback             | Releases the cue / cuelist on the given playback. See Levels and scaling below for what the variable does  |
 | Playback jump to cue         | Jumps to the given cue on the given playback                                                               |
-| Desk Black Out               | Turn on, turn off, or toggle DBO                                                                           |
+| Desk Black Out               | Presses the console's DBO button. What that does depends on the desk - see Desk black out below            |
 | Set Swap Mode                | Sets the swap mode to add or swap                                                                          |
 | Execute                      | Control or toggle Execute buttons / faders (page and number 1-1000)                                        |
 | Adjust Execute level         | Adjusts the execute fader level by the given value 0 - 100 %                                               |
@@ -63,6 +63,34 @@ variable therefore keeps showing the fader's real position, and a button watchin
 With feedback off there is nothing to report the truth, so the module sets the level variable to
 0 itself.
 
+## Desk black out
+
+**The Desk Black Out action presses the console's DBO button. It does not set a black out
+state.** What the press actually does is the desk's decision, not the module's: it follows the
+**DBO Function** setting on the console, and the module has no way to read that setting or to
+find out what happened afterwards.
+
+Sending `1` is the press and `0` is the release. Measured against a desk:
+
+| DBO Function    | What "Black Out On" (`1`) does                          | What "Black Out Off" (`0`) does                  |
+| --------------- | ------------------------------------------------------- | ------------------------------------------------ |
+| **Momentary**   | Blacks out, and stays out - OSC has no physical release | Releases it, so black out ends                   |
+| **Latched**     | **Toggles** black out                                   | **Nothing** - there is no held button to release |
+| **Tap to time** | **Taps the tempo.** No black out at all                 | Nothing                                          |
+
+So the action's names only describe reality on a **momentary** DBO button, which is what this
+module assumes. On anything else:
+
+- On a **latched** button, _Black Out Off_ will not clear black out. Press _Black Out On_ a
+  second time instead.
+- On a **tap to time** button, none of these buttons black anything out - they tap tempo on a
+  playback, and _Black Out Toggle_ taps on only every other press, because it alternates between
+  `1` and `0` and only `1` taps.
+
+In every case the **Desk Black Out** feedback shows what this connection last sent, not what the
+desk did, because MagicQ never reports black out state over OSC. If the two can disagree on your
+desk, don't rely on the feedback to tell you whether the rig is dark.
+
 ## Execute types
 
 An execute's behaviour depends on how it is programmed on the console, and the module cannot
@@ -85,12 +113,12 @@ position. An "Execute release" button pointed at such an execute will stay lit.
 
 ## Feedbacks
 
-| Feedback       | What it does                                                                                                     |
-| -------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Playback Level | Set feedback based on the playback fader level (0 - 100%)                                                        |
-| Playback Flash | Set feedback based on the playback flash button (on/off)                                                         |
-| Execute Level  | Set feedback based on the execute fader or button level (0 - 100%)                                               |
-| Desk Black Out | Lights while this connection has DBO on. MagicQ does not report DBO back, so it follows what Companion last sent |
+| Feedback       | What it does                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------ |
+| Playback Level | Set feedback based on the playback fader level (0 - 100%)                                                    |
+| Playback Flash | Set feedback based on the playback flash button (on/off)                                                     |
+| Execute Level  | Set feedback based on the execute fader or button level (0 - 100%)                                           |
+| Desk Black Out | Lights while this connection believes DBO is on. MagicQ never reports DBO, so it follows what Companion sent |
 
 ## Variables
 

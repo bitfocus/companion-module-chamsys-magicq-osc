@@ -398,7 +398,10 @@ export default function UpdatePresets(self) {
 			id: 'desk',
 			name: 'Desk',
 			description:
-				"Desk black out and swap mode. All three black out buttons light while this connection has black out on - MagicQ does not report the desk's own DBO state back over OSC.",
+				"Desk black out and swap mode. The black out buttons press the console's DBO button rather than " +
+				"setting a state, so what they do follows the desk's DBO Function setting - see the module help. " +
+				"They light while this connection believes black out is on; MagicQ never reports the desk's own " +
+				'DBO state back over OSC.',
 			definitions: ['dbo_toggle', 'dbo_on', 'dbo_off', 'swap_add', 'swap_swap'],
 		},
 	]
