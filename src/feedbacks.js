@@ -185,9 +185,11 @@ export default function UpdateFeedbacks(self) {
 			name: 'Desk Black Out',
 			defaultStyle: {
 				color: combineRgb(0, 0, 0),
-				bgcolor: combineRgb(255, 153, 0),
+				// the same orange the black out presets use
+				bgcolor: combineRgb(204, 102, 0),
 			},
-			description: 'Feedback based on the desk black out state',
+			description:
+				'True while this connection has desk black out on. MagicQ does not report DBO back over OSC, so this follows what Companion last sent, not the desk.',
 			// MagicQ does not report DBO back over OSC, so this reflects what this
 			// connection last sent - the same basis the DBO toggle already uses.
 			options: [],

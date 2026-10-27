@@ -29,7 +29,7 @@ On MagicQ, set the OSC TX IP to the IP of the machine running Companion for feed
 | Go on Playback               | Advance the cue list on the playback given, as you would by pressing the go button on the console Playback |
 | Flash playback               | Turn on, turn off, or toggle the flash button                                                              |
 | Pause Playback               | Pauses the running cue / cuelist on the given playback                                                     |
-| Release Playback             | Releases the cue / cuelist on the given playback                                                           |
+| Release Playback             | Releases the cue / cuelist on the given playback, and sets that playback's level variable to 0             |
 | Playback jump to cue         | Jumps to the given cue on the given playback                                                               |
 | Desk Black Out               | Turn on, turn off, or toggle DBO                                                                           |
 | Set Swap Mode                | Sets the swap mode to add or swap                                                                          |
@@ -40,11 +40,12 @@ On MagicQ, set the OSC TX IP to the IP of the machine running Companion for feed
 
 ## Feedbacks
 
-| Feedback       | What it does                                                       |
-| -------------- | ------------------------------------------------------------------ |
-| Playback Level | Set feedback based on the playback fader level (0 - 100%)          |
-| Playback Flash | Set feedback based on the playback flash button (on/off)           |
-| Execute Level  | Set feedback based on the execute fader or button level (0 - 100%) |
+| Feedback       | What it does                                                                                                     |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Playback Level | Set feedback based on the playback fader level (0 - 100%)                                                        |
+| Playback Flash | Set feedback based on the playback flash button (on/off)                                                         |
+| Execute Level  | Set feedback based on the execute fader or button level (0 - 100%)                                               |
+| Desk Black Out | Lights while this connection has DBO on. MagicQ does not report DBO back, so it follows what Companion last sent |
 
 ## Variables
 

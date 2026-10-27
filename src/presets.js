@@ -304,7 +304,7 @@ export default function UpdatePresets(self) {
 			id: 'playbacks',
 			name: 'Playbacks',
 			description:
-				'Playback faders 1-10. Each button lights while its playback is above zero, as reported by the console.',
+				'Playback faders 1-10. Each button lights while its playback is above zero - as reported by the console when Enable Feedback is on, and as sent by this connection when it is off.',
 			definitions: [
 				{
 					id: 'playback_levels',
@@ -397,7 +397,8 @@ export default function UpdatePresets(self) {
 		{
 			id: 'desk',
 			name: 'Desk',
-			description: 'Desk black out and swap mode. The black out buttons light while the desk is blacked out.',
+			description:
+				"Desk black out and swap mode. All three black out buttons light while this connection has black out on - MagicQ does not report the desk's own DBO state back over OSC.",
 			definitions: ['dbo_toggle', 'dbo_on', 'dbo_off', 'swap_add', 'swap_swap'],
 		},
 	]
