@@ -214,15 +214,20 @@ export default function UpdateActions(self) {
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/release')
-				// A released playback is no longer putting anything out, so track it
-				// the way the fader actions do. Without this, a connection with
-				// feedback off keeps reporting the last level it sent, and every
-				// button watching that playback stays lit after it was released.
-				self.playbacks[pbId].value = 0
-				self.setTrackedVariables({
-					['pb' + pbId]: 0,
-				})
-				self.checkFeedbacks('pb')
+				// Release deactivates the playback but leaves its fader alone: measured
+				// against a desk, /pb/N/release changes neither the reported level nor
+				// the flash state. So only track it here when the console is not
+				// reporting - with feedback on, the next dump would overwrite this zero
+				// with the fader's real level a moment later and the button would light
+				// again. With feedback off nothing can correct us, and without this
+				// every button watching that playback stays lit after it was released.
+				if (!self.feedbackEnabled()) {
+					self.playbacks[pbId].value = 0
+					self.setTrackedVariables({
+						['pb' + pbId]: 0,
+					})
+					self.checkFeedbacks('pb')
+				}
 			},
 		},
 
