@@ -37,7 +37,14 @@ export default function UpdateActions(self) {
 					value: pbVal,
 				}
 				self.sendOSC('/pb/' + pbId, arg)
-				// set the value in the playbacks array since magicQ does not send feedback for OSC commands
+				// Track the value we just sent. MagicQ reports manual fader moves but
+				// never its own OSC-driven changes, so without this the variable would
+				// not move until the feedback watchdog's next dump, up to 10s later.
+				//
+				// That dump may then correct us by a percent: the console stores levels
+				// in 255ths, so a sent 50 comes back as 129/255 and reads as 51.
+				// Measured against a desk, and the lesser of two evils - dropping this
+				// write to avoid the correction would leave the button stale for 10s.
 				self.playbacks[pbId].value = pbVal
 				self.setTrackedVariables({
 					['pb' + pbId]: pbVal,
@@ -214,6 +221,20 @@ export default function UpdateActions(self) {
 					return
 				}
 				self.sendOSC('/pb/' + pbId + '/release')
+				// Release deactivates the playback but leaves its fader alone: measured
+				// against a desk, /pb/N/release changes neither the reported level nor
+				// the flash state. So only track it here when the console is not
+				// reporting - with feedback on, the next dump would overwrite this zero
+				// with the fader's real level a moment later and the button would light
+				// again. With feedback off nothing can correct us, and without this
+				// every button watching that playback stays lit after it was released.
+				if (!self.feedbackEnabled()) {
+					self.playbacks[pbId].value = 0
+					self.setTrackedVariables({
+						['pb' + pbId]: 0,
+					})
+					self.checkFeedbacks('pb')
+				}
 			},
 		},
 
@@ -280,8 +301,9 @@ export default function UpdateActions(self) {
 				}
 				self.sendOSC('/dbo', arg)
 				// magicQ does not send feedback for OSC commands, so track the
-				// resolved state here for the next toggle
+				// resolved state here for the next toggle and for the feedback
 				self.dbo = dboVal
+				self.checkFeedbacks('dbo')
 			},
 		},
 
@@ -319,7 +341,7 @@ export default function UpdateActions(self) {
 			options: [
 				{
 					type: 'textinput',
-					label: 'Execute Page',
+					label: `Execute Page (1-${MAX_EXEC_PAGE})`,
 					id: 'exeP',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -327,7 +349,7 @@ export default function UpdateActions(self) {
 				},
 				{
 					type: 'textinput',
-					label: 'Execute Nr',
+					label: `Execute Nr (1-${MAX_EXEC_NR})`,
 					id: 'exeNr',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -392,7 +414,7 @@ export default function UpdateActions(self) {
 			options: [
 				{
 					type: 'textinput',
-					label: 'Execute Page',
+					label: `Execute Page (1-${MAX_EXEC_PAGE})`,
 					id: 'exeP',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -400,7 +422,7 @@ export default function UpdateActions(self) {
 				},
 				{
 					type: 'textinput',
-					label: 'Execute Number',
+					label: `Execute Number (1-${MAX_EXEC_NR})`,
 					id: 'exeNr',
 					default: '1',
 					regex: Regex.NUMBER,
