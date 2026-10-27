@@ -29,7 +29,7 @@ On MagicQ, set the OSC TX IP to the IP of the machine running Companion for feed
 | Go on Playback               | Advance the cue list on the playback given, as you would by pressing the go button on the console Playback |
 | Flash playback               | Turn on, turn off, or toggle the flash button                                                              |
 | Pause Playback               | Pauses the running cue / cuelist on the given playback                                                     |
-| Release Playback             | Releases the cue / cuelist on the given playback, and sets that playback's level variable to 0             |
+| Release Playback             | Releases the cue / cuelist on the given playback. See Levels and scaling below for what the variable does  |
 | Playback jump to cue         | Jumps to the given cue on the given playback                                                               |
 | Desk Black Out               | Turn on, turn off, or toggle DBO                                                                           |
 | Set Swap Mode                | Sets the swap mode to add or swap                                                                          |
@@ -37,6 +37,51 @@ On MagicQ, set the OSC TX IP to the IP of the machine running Companion for feed
 | Adjust Execute level         | Adjusts the execute fader level by the given value 0 - 100 %                                               |
 | 10 Scene                     | Control 10Scene buttons / faders                                                                           |
 | RPC Command                  | Send a RPC command to the console                                                                          |
+
+## Levels and scaling
+
+These are measured against a real MagicQ, not assumed, and they explain a few things that
+otherwise look like faults.
+
+**The console reports levels in 255ths.** A playback at full arrives as `1.0039` (256/255),
+slightly above the 0.0-1.0 you would expect. The module rounds to a percentage, so you still
+see `100`.
+
+**A level you set can read back one percent different.** Set a playback to 50 and the console
+stores 129/255, which is 50.6%, so the variable settles at `51` within about ten seconds. The
+module shows what you sent straight away because MagicQ does not report its own OSC-driven
+changes; the correction arrives with the next feedback refresh. Nothing is wrong - the console
+simply has a finer scale than whole percentages.
+
+**Manual moves are reported immediately; OSC-driven ones are not.** Moving a fader on the desk
+streams updates in real time. Changes made _by_ this module are never echoed back, which is why
+the module tracks what it sends.
+
+**Release does not lower the fader.** `Release` deactivates the playback, but its fader stays
+where it is and the console keeps reporting that level. With **Enable Feedback** on, the level
+variable therefore keeps showing the fader's real position, and a button watching it stays lit.
+With feedback off there is nothing to report the truth, so the module sets the level variable to
+0 itself.
+
+## Execute types
+
+An execute's behaviour depends on how it is programmed on the console, and the module cannot
+tell which type it is.
+
+| Execute type | Setting it to 50% does this                                |
+| ------------ | ---------------------------------------------------------- |
+| Fader        | Goes to 50%, and reads back `50`                           |
+| Button       | Turns fully on - any non-zero value does. Reads back `100` |
+| Solo         | Turns fully on. Reads back `100`                           |
+| Encoder      | Turns fully on. Reads back `100`                           |
+| Flash        | Momentary - it does not latch, and reads back `0`          |
+
+So the level on the **Execute** action is only meaningful for fader-type executes. For every
+other type, treat any non-zero value as "on".
+
+One more quirk worth knowing: an execute whose own playback settings keep it **active** with its
+fader at zero reports `100`, because the reported value follows activation rather than fader
+position. An "Execute release" button pointed at such an execute will stay lit.
 
 ## Feedbacks
 
