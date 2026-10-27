@@ -33,7 +33,7 @@ On MagicQ, set the OSC TX IP to the IP of the machine running Companion for feed
 | Playback jump to cue         | Jumps to the given cue on the given playback                                                               |
 | Desk Black Out               | Presses the console's DBO button. What that does depends on the desk - see Desk black out below            |
 | Set Swap Mode                | Sets the swap mode to add or swap                                                                          |
-| Execute                      | Control or toggle Execute buttons / faders (page and number 1-1000)                                        |
+| Execute                      | Control or toggle Execute buttons / faders (page 1-10, number 1-1000)                                      |
 | Adjust Execute level         | Adjusts the execute fader level by the given value 0 - 100 %                                               |
 | 10 Scene                     | Control 10Scene buttons / faders                                                                           |
 | RPC Command                  | Send a RPC command to the console                                                                          |
@@ -103,6 +103,9 @@ tell which type it is.
 | Solo         | Turns fully on. Reads back `100`                           |
 | Encoder      | Turns fully on. Reads back `100`                           |
 | Flash        | Momentary - it does not latch, and reads back `0`          |
+
+**Execute pages run 1-10.** MagicQ's built-in OSC addresses reach the first 10 execute grids
+only; a higher page is simply ignored by the desk. Item numbers within a grid go much higher.
 
 So the level on the **Execute** action is only meaningful for fader-type executes. For every
 other type, treat any non-zero value as "on".
