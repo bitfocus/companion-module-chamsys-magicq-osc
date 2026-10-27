@@ -37,6 +37,15 @@ const EXECUTE_LOCALS = [
 const EXECUTE = { isExpression: true, value: '$(local:exec)' }
 const EXECUTE_PAGE = { isExpression: true, value: '$(local:page)' }
 
+// Lights the button while the desk is blacked out.
+function blackoutFeedback() {
+	return {
+		feedbackId: 'dbo',
+		options: {},
+		style: { bgcolor: BLACKOUT, color: BLACK },
+	}
+}
+
 // Lights the button while the playback is above zero.
 function playbackActiveFeedback() {
 	return {
@@ -244,9 +253,9 @@ export default function UpdatePresets(self) {
 		type: 'simple',
 		name: 'Desk black out - toggle',
 		keywords: ['dbo', 'blackout', 'black out'],
-		style: { ...style('DBO', 'auto'), bgcolor: BLACKOUT, color: BLACK },
+		style: style('DBO', 'auto'),
 		steps: [{ down: [{ actionId: 'dbo', options: { dboId: '2' } }], up: [] }],
-		feedbacks: [],
+		feedbacks: [blackoutFeedback()],
 	}
 
 	presets['dbo_on'] = {
@@ -255,7 +264,7 @@ export default function UpdatePresets(self) {
 		keywords: ['dbo', 'blackout', 'black out'],
 		style: style('DBO\\nON', 'auto'),
 		steps: [{ down: [{ actionId: 'dbo', options: { dboId: '1' } }], up: [] }],
-		feedbacks: [],
+		feedbacks: [blackoutFeedback()],
 	}
 
 	presets['dbo_off'] = {
@@ -264,7 +273,7 @@ export default function UpdatePresets(self) {
 		keywords: ['dbo', 'blackout', 'black out'],
 		style: style('DBO\\nOFF', 'auto'),
 		steps: [{ down: [{ actionId: 'dbo', options: { dboId: '0' } }], up: [] }],
-		feedbacks: [],
+		feedbacks: [blackoutFeedback()],
 	}
 
 	presets['swap_add'] = {
@@ -388,7 +397,7 @@ export default function UpdatePresets(self) {
 		{
 			id: 'desk',
 			name: 'Desk',
-			description: 'Desk black out and swap mode.',
+			description: 'Desk black out and swap mode. The black out buttons light while the desk is blacked out.',
 			definitions: ['dbo_toggle', 'dbo_on', 'dbo_off', 'swap_add', 'swap_swap'],
 		},
 	]

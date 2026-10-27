@@ -289,8 +289,9 @@ export default function UpdateActions(self) {
 				}
 				self.sendOSC('/dbo', arg)
 				// magicQ does not send feedback for OSC commands, so track the
-				// resolved state here for the next toggle
+				// resolved state here for the next toggle and for the feedback
 				self.dbo = dboVal
+				self.checkFeedbacks('dbo')
 			},
 		},
 

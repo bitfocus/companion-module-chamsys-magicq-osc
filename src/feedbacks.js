@@ -180,5 +180,18 @@ export default function UpdateFeedbacks(self) {
 				}
 			},
 		},
+		dbo: {
+			type: 'boolean',
+			name: 'Desk Black Out',
+			defaultStyle: {
+				color: combineRgb(0, 0, 0),
+				bgcolor: combineRgb(255, 153, 0),
+			},
+			description: 'Feedback based on the desk black out state',
+			// MagicQ does not report DBO back over OSC, so this reflects what this
+			// connection last sent - the same basis the DBO toggle already uses.
+			options: [],
+			callback: () => self.dbo === 1,
+		},
 	})
 }
