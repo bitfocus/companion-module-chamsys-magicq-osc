@@ -7,9 +7,10 @@ import { MAX_EXEC_PAGE } from './constants.js'
 // shortname stands in for it here.
 const VARIABLE_PREFIX = 'magicq'
 
-// MagicQ's OSC spec addresses playbacks 1-10. Executes have no fixed limit, so
-// the preset list offers a usable first page and the page is left editable on
-// the button rather than generating every combination.
+// MagicQ's OSC spec addresses playbacks 1-10, and execute pages 1-10. A page
+// holds far more executes than are worth listing, so the preset list offers a
+// usable first page and the page is left editable on the button rather than
+// generating every combination.
 const PLAYBACK_COUNT = 10
 const EXECUTE_COUNT = 12
 

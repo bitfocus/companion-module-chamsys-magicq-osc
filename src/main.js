@@ -30,7 +30,7 @@ export default class MagicQInstance extends InstanceBase {
 			}
 		}
 		this.execs = []
-		for (let i = 1; i <= 10; i++) {
+		for (let i = 1; i <= MAX_EXEC_PAGE; i++) {
 			this.execs[i] = []
 		}
 		// desk black out state, tracked so the DBO toggle has something to read
@@ -282,12 +282,20 @@ export default class MagicQInstance extends InstanceBase {
 		} else if (execRegex.test(msg.address)) {
 			const match = msg.address.match(execRegex)
 			const target = this.parseExecTarget(match[1], match[2])
-			const execVal = this.oscNumber(msg)
-			if (target === undefined || execVal === undefined) {
+			if (target === undefined) {
+				// debug, not warn: with OSC forwarding on, this socket also carries
+				// traffic from other senders, and an unrelated /exec/ address would
+				// otherwise fill the log of a connection that is working fine. The
+				// playback branch ignores out-of-range addresses the same way.
 				this.log(
-					'warn',
+					'debug',
 					'Ignoring ' + msg.address + ': execute page must be 1-' + MAX_EXEC_PAGE + ' and number 1-' + MAX_EXEC_NR,
 				)
+				return
+			}
+			const execVal = this.oscNumber(msg)
+			if (execVal === undefined) {
+				this.log('debug', 'Ignoring ' + msg.address + ': value is not a number')
 				return
 			}
 			const { execPage, execNr } = target

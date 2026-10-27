@@ -341,7 +341,7 @@ export default function UpdateActions(self) {
 			options: [
 				{
 					type: 'textinput',
-					label: 'Execute Page',
+					label: `Execute Page (1-${MAX_EXEC_PAGE})`,
 					id: 'exeP',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -349,7 +349,7 @@ export default function UpdateActions(self) {
 				},
 				{
 					type: 'textinput',
-					label: 'Execute Nr',
+					label: `Execute Nr (1-${MAX_EXEC_NR})`,
 					id: 'exeNr',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -414,7 +414,7 @@ export default function UpdateActions(self) {
 			options: [
 				{
 					type: 'textinput',
-					label: 'Execute Page',
+					label: `Execute Page (1-${MAX_EXEC_PAGE})`,
 					id: 'exeP',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -422,7 +422,7 @@ export default function UpdateActions(self) {
 				},
 				{
 					type: 'textinput',
-					label: 'Execute Number',
+					label: `Execute Number (1-${MAX_EXEC_NR})`,
 					id: 'exeNr',
 					default: '1',
 					regex: Regex.NUMBER,

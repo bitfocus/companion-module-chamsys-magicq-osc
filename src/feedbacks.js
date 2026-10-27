@@ -1,5 +1,7 @@
 import { Regex, combineRgb } from '@companion-module/base'
 
+import { MAX_EXEC_PAGE, MAX_EXEC_NR } from './constants.js'
+
 export default function UpdateFeedbacks(self) {
 	self.setFeedbackDefinitions({
 		pb: {
@@ -109,7 +111,7 @@ export default function UpdateFeedbacks(self) {
 			options: [
 				{
 					type: 'textinput',
-					label: 'Execute Page',
+					label: `Execute Page (1-${MAX_EXEC_PAGE})`,
 					id: 'execPage',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -117,7 +119,7 @@ export default function UpdateFeedbacks(self) {
 				},
 				{
 					type: 'textinput',
-					label: 'Execute Number',
+					label: `Execute Number (1-${MAX_EXEC_NR})`,
 					id: 'execNumber',
 					default: '1',
 					regex: Regex.NUMBER,
@@ -151,9 +153,18 @@ export default function UpdateFeedbacks(self) {
 			],
 			callback: (feedback) => {
 				const target = self.parseExecTarget(feedback.options.execPage, feedback.options.execNumber)
+				if (target === undefined) {
+					// Say why, or a feedback pointed at a page the console cannot
+					// address is just a button that never lights.
+					self.log(
+						'debug',
+						`Execute Level feedback ignored: page must be 1-${MAX_EXEC_PAGE} and number 1-${MAX_EXEC_NR}`,
+					)
+					return false
+				}
 				const execVal = self.parseOption(feedback.options.execVal, 0, 100)
 				const execComp = feedback.options.execComp
-				if (target === undefined || (execComp !== 'isActive' && execVal === undefined)) {
+				if (execComp !== 'isActive' && execVal === undefined) {
 					return false
 				}
 				// An execute nobody has touched yet has no stored level. Treat it as
